@@ -1,0 +1,196 @@
+{
+  "projectType": "framework",
+  "projectName": "Oh My OpenAgent",
+  "projectDescription": "The best AI agent harness with multi-model orchestration, parallel background agents, and batteries-included OpenCode plugin",
+  "theme": "aspen",
+  "primaryColor": "#04bfde",
+  "lightColor": "#0e1517",
+  "darkColor": "#c5c5c5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/overview",
+              "concepts/agents",
+              "concepts/orchestration",
+              "concepts/ultrawork"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/agent-model-matching",
+              "guides/configuration",
+              "guides/skills",
+              "guides/commands",
+              "guides/hooks"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/discipline-agents",
+              "features/background-agents",
+              "features/hash-anchored-edits",
+              "features/lsp-ast-tools",
+              "features/built-in-mcps",
+              "features/skill-embedded-mcps",
+              "features/tmux-integration",
+              "features/claude-code-compatibility"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/deep-initialization",
+              "advanced/prometheus-planner",
+              "advanced/ralph-loop",
+              "advanced/todo-enforcer",
+              "advanced/comment-checker"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/doctor-checks"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Agents",
+            "pages": [
+              "api/agents/sisyphus",
+              "api/agents/hephaestus",
+              "api/agents/prometheus",
+              "api/agents/oracle",
+              "api/agents/librarian",
+              "api/agents/explore",
+              "api/agents/atlas",
+              "api/agents/metis",
+              "api/agents/momus",
+              "api/agents/multimodal-looker"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "api/tools/overview",
+              "api/tools/lsp",
+              "api/tools/ast-grep",
+              "api/tools/hashline-edit",
+              "api/tools/background-task",
+              "api/tools/session-manager"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "api/hooks/overview",
+              "api/hooks/session-hooks",
+              "api/hooks/tool-guard-hooks",
+              "api/hooks/transform-hooks",
+              "api/hooks/continuation-hooks"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/config/schema",
+              "api/config/agents",
+              "api/config/categories",
+              "api/config/experimental"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "api/cli/install",
+              "api/cli/run",
+              "api/cli/doctor",
+              "api/cli/mcp-oauth"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Community",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "community/manifesto",
+              "community/contributing",
+              "community/cla"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-agent orchestration with 11 specialized agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal Looker, Sisyphus Junior)",
+    "Ultrawork mode - one command to activate all agents and execute until completion",
+    "Hash-anchored edit tool with LINE#ID content validation to eliminate stale-line errors",
+    "LSP and AST-Grep integration for IDE-precision refactoring and code analysis",
+    "Background agent execution with parallel task orchestration",
+    "Built-in MCPs for web search (Exa/Tavily), official docs (Context7), and GitHub search (Grep.app)",
+    "Skill-embedded MCP servers for on-demand context-scoped tools",
+    "Full Claude Code compatibility (hooks, commands, skills, MCPs, plugins)",
+    "Tmux integration for interactive terminal sessions and REPLs",
+    "46 lifecycle hooks across 5 tiers (Session, Tool-Guard, Transform, Continuation, Skill)",
+    "26 tools including delegate-task, call-omo-agent, ast-grep, lsp, hashline-edit, background-task",
+    "Ralph Loop for self-referential continuous execution",
+    "Todo Enforcer to prevent agent idle states",
+    "Comment Checker to eliminate AI-generated comment patterns",
+    "Deep initialization with hierarchical AGENTS.md generation",
+    "Prometheus strategic planner with interview-mode planning",
+    "Multi-level JSONC configuration with Zod v4 validation",
+    "CLI with install, run, doctor, and mcp-oauth commands",
+    "Multi-model support (Claude, GPT, Gemini, Kimi, GLM, MiniMax, Grok) with automatic model-agent matching",
+    "Category-based task delegation (visual-engineering, deep, quick, ultrabrain)"
+  ],
+  "publicApiSurface": [
+    "OhMyOpenCodePlugin - Main plugin entry point",
+    "OhMyOpenCodeConfig - Configuration schema",
+    "AgentName - Built-in agent names (sisyphus, hephaestus, prometheus, oracle, librarian, explore, atlas, metis, momus, multimodal-looker, sisyphus-junior)",
+    "HookName - 46 hook names across session, tool-guard, transform, continuation, and skill tiers",
+    "BuiltinCommandName - Built-in command names",
+    "McpName - MCP server names (websearch, context7, grep_app)",
+    "AgentOverrideConfig - Per-agent configuration overrides",
+    "CategoryConfig - Task category definitions",
+    "oh-my-opencode install - Interactive CLI installer",
+    "oh-my-opencode run - Non-interactive session runner",
+    "oh-my-opencode doctor - Health check diagnostics",
+    "oh-my-opencode mcp-oauth - OAuth token management",
+    "/ultrawork (ulw) - One-command orchestration mode",
+    "/start-work - Prometheus-based strategic planning workflow",
+    "/init-deep - Hierarchical AGENTS.md generation",
+    "/ulw-loop - Ralph Loop activation",
+    "createXXXAgent factories - Agent builder pattern",
+    "createXXXTool factories - Tool builder pattern",
+    "createXXXHook factories - Hook builder pattern",
+    "SkillContext - Skill management context",
+    "BackgroundManager - Background task orchestration",
+    "TmuxSessionManager - Tmux session management",
+    "SkillMcpManager - Skill-embedded MCP lifecycle",
+    "ConfigHandler - Multi-level config loading",
+    "ToolRegistry - 26 registered tools"
+  ]
+}
