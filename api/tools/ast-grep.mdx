@@ -1,0 +1,223 @@
+---
+title: AST-Grep Tools
+description: Structural code search and replacement using AST-aware pattern matching
+---
+
+## Overview
+
+AST-Grep tools provide structural code search and replacement across 25 programming languages. Unlike text-based search, AST-Grep understands code structure and uses meta-variables for pattern matching.
+
+## Available Tools
+
+### ast_grep_search
+
+Search code patterns using AST-aware matching with meta-variables.
+
+<ParamField path="pattern" type="string" required>
+  AST pattern with meta-variables. Must be complete AST node (valid code).
+  - `$VAR` matches single node
+  - `$$$` matches multiple nodes
+</ParamField>
+
+<ParamField path="lang" type="string" required>
+  Target language. Supports 25 languages including:
+  - javascript, typescript, tsx, jsx
+  - python, rust, go, java, kotlin
+  - c, cpp, csharp, swift, ruby
+  - And more...
+</ParamField>
+
+<ParamField path="paths" type="string[]">
+  Paths to search (default: current directory)
+</ParamField>
+
+<ParamField path="globs" type="string[]">
+  Include/exclude globs. Prefix with `!` to exclude.
+</ParamField>
+
+<ParamField path="context" type="number">
+  Number of context lines around each match
+</ParamField>
+
+**Returns:** Formatted search results with file paths, line numbers, and matched code
+
+**Examples:**
+
+```typescript
+// Find all console.log calls
+ast_grep_search({
+  pattern: "console.log($MSG)",
+  lang: "javascript"
+})
+
+// Find async functions
+ast_grep_search({
+  pattern: "async function $NAME($$$) { $$$ }",
+  lang: "typescript",
+  paths: ["src/"]
+})
+
+// Find Python class definitions
+ast_grep_search({
+  pattern: "class $CLASS",
+  lang: "python",
+  globs: ["**/*.py", "!tests/**"]
+})
+```
+
+### ast_grep_replace
+
+Replace code patterns with AST-aware rewriting. Dry-run by default.
+
+<ParamField path="pattern" type="string" required>
+  AST pattern to match (same syntax as search)
+</ParamField>
+
+<ParamField path="rewrite" type="string" required>
+  Replacement pattern. Can use meta-variables from pattern.
+</ParamField>
+
+<ParamField path="lang" type="string" required>
+  Target language
+</ParamField>
+
+<ParamField path="paths" type="string[]">
+  Paths to search
+</ParamField>
+
+<ParamField path="globs" type="string[]">
+  Include/exclude globs
+</ParamField>
+
+<ParamField path="dryRun" type="boolean">
+  Preview changes without applying (default: true)
+</ParamField>
+
+**Returns:** Formatted replacement results showing what would change (dry-run) or what changed (actual)
+
+**Examples:**
+
+```typescript
+// Replace console.log with logger.info (dry-run)
+ast_grep_replace({
+  pattern: "console.log($MSG)",
+  rewrite: "logger.info($MSG)",
+  lang: "javascript"
+})
+
+// Actually apply the replacement
+ast_grep_replace({
+  pattern: "console.log($MSG)",
+  rewrite: "logger.info($MSG)",
+  lang: "javascript",
+  dryRun: false
+})
+
+// Rename function calls
+ast_grep_replace({
+  pattern: "fetchUser($ID)",
+  rewrite: "getUserById($ID)",
+  lang: "typescript",
+  paths: ["src/api/"]
+})
+```
+
+## Pattern Syntax
+
+### Meta-Variables
+
+- `$VAR` - Matches a single AST node
+- `$$$` - Matches multiple nodes (zero or more)
+- `$_` - Matches any single node (anonymous)
+
+### Complete AST Nodes
+
+Patterns must be **complete, valid code**:
+
+✅ **Correct:**
+```typescript
+"function $NAME($$$) { $$$ }"  // Complete function
+"class $CLASS { $$$ }"         // Complete class
+"if ($COND) { $$$ }"            // Complete if statement
+```
+
+❌ **Incorrect:**
+```typescript
+"function $NAME"                // Incomplete - missing params and body
+"class $CLASS:"                 // Python class with trailing colon
+"export async function $NAME"   // Missing params and body
+```
+
+### Language-Specific Hints
+
+**Python:**
+- Remove trailing colons: `class User` not `class User:`
+- Use complete signatures: `def $FUNC($$$): $$$` not `def $FUNC($$$):`
+
+**JavaScript/TypeScript:**
+- Include params and body: `function $NAME($$$) { $$$ }`
+- For arrow functions: `($$$) => $$$`
+
+## Supported Languages
+
+25 languages supported:
+
+- **Web:** javascript, typescript, tsx, jsx, html, css
+- **Backend:** python, rust, go, java, kotlin, csharp, swift
+- **Systems:** c, cpp
+- **Scripting:** ruby, lua, php, bash
+- **Other:** json, yaml, sql, dart, elixir, scala
+
+## Error Handling
+
+### Empty Results
+
+When searches return no matches, the tool provides hints:
+
+```
+No matches found.
+
+Hint: Remove trailing colon. Try: "class User" instead of "class User:"
+```
+
+### Syntax Errors
+
+Invalid patterns return parse errors with suggestions:
+
+```
+Error: Pattern must be complete AST node.
+Try: "function $NAME($$$) { $$$ }" instead of "function $NAME"
+```
+
+## Implementation Details
+
+### CLI Binary
+
+Uses the `ast-grep` CLI binary (sg):
+- Auto-downloads on first use
+- Platform-specific binaries (Linux, macOS, Windows)
+- Timeout: 60 seconds per operation
+
+### Result Formatting
+
+Results are formatted for LLM consumption:
+- File paths with line numbers
+- Matched code with syntax highlighting hints
+- Context lines when requested
+- Diff output for replacements
+
+## Configuration
+
+Disable AST-Grep tools in config:
+
+```json
+{
+  "disabled_tools": ["ast_grep_search", "ast_grep_replace"]
+}
+```
+
+## Related Documentation
+
+- [Tools Overview](/api/tools/overview)
+- [LSP Tools](/api/tools/lsp)
+- [Hashline Edit](/api/tools/hashline-edit)

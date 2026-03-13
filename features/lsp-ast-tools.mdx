@@ -1,0 +1,552 @@
+---
+title: LSP and AST Tools
+description: IDE-precision refactoring, diagnostics, and code search for AI agents across 25+ languages
+---
+
+## Overview
+
+Oh My OpenAgent provides two powerful tool suites for code analysis and manipulation:
+
+- **LSP Tools**: IDE-grade refactoring, navigation, and diagnostics
+- **AST-Grep Tools**: Pattern-based code search and transformation across 25 languages
+
+These give agents the same precision capabilities as a developer using an IDE.
+
+## LSP Tools
+
+### What is LSP?
+
+Language Server Protocol (LSP) provides IDE features like:
+- Go to definition
+- Find all references  
+- Rename symbol across workspace
+- Real-time diagnostics (errors/warnings)
+- Symbol search
+
+Agents can use these for safe, comprehensive refactoring.
+
+### Available LSP Tools
+
+<AccordionGroup>
+  <Accordion title="lsp_goto_definition">
+    Jump to the definition of a symbol.
+    
+    **Parameters**:
+    - `filePath`: File containing the symbol
+    - `line`: Line number (1-based)
+    - `character`: Column position (0-based)
+    
+    **Returns**: Location(s) of definition(s)
+    
+    **Example**:
+    ```typescript
+    lsp_goto_definition(
+      filePath="src/services/auth.ts",
+      line=42,
+      character=15
+    )
+    // → { file: "src/types/user.ts", line: 10, character: 0 }
+    ```
+  </Accordion>
+
+  <Accordion title="lsp_find_references">
+    Find all references to a symbol across the workspace.
+    
+    **Parameters**:
+    - `filePath`: File containing the symbol
+    - `line`: Line number (1-based)
+    - `character`: Column position (0-based)
+    - `includeDeclaration`: Include the declaration itself (default: true)
+    
+    **Returns**: List of all references
+    
+    **Example**:
+    ```typescript
+    lsp_find_references(
+      filePath="src/types/user.ts",
+      line=10,
+      character=13,
+      includeDeclaration=false
+    )
+    // → [
+    //   { file: "src/services/auth.ts", line: 42, ... },
+    //   { file: "src/api/routes.ts", line: 18, ... },
+    //   ...
+    // ]
+    ```
+  </Accordion>
+
+  <Accordion title="lsp_rename">
+    Rename a symbol across the entire workspace.
+    
+    **Parameters**:
+    - `filePath`: File containing the symbol
+    - `line`: Line number (1-based)
+    - `character`: Column position (0-based)
+    - `newName`: New name for the symbol
+    
+    **Returns**: Workspace edit with all changes
+    
+    **Example**:
+    ```typescript
+    lsp_rename(
+      filePath="src/types/user.ts",
+      line=10,
+      character=13,
+      newName="AuthenticatedUser"
+    )
+    // Renames interface User → AuthenticatedUser everywhere
+    ```
+  </Accordion>
+
+  <Accordion title="lsp_prepare_rename">
+    Validate that a rename operation is possible.
+    
+    **Parameters**:
+    - `filePath`: File containing the symbol
+    - `line`: Line number (1-based)
+    - `character`: Column position (0-based)
+    
+    **Returns**: Range that will be renamed, or error if invalid
+    
+    **Example**:
+    ```typescript
+    lsp_prepare_rename(
+      filePath="src/types/user.ts",
+      line=10,
+      character=13
+    )
+    // → { start: { line: 10, character: 10 }, end: { line: 10, character: 14 } }
+    ```
+  </Accordion>
+
+  <Accordion title="lsp_diagnostics">
+    Get errors, warnings, and info messages for a file.
+    
+    **Parameters**:
+    - `filePath`: File to check (optional - all files if omitted)
+    - `severity`: Filter by severity ("error", "warning", "info", "hint")
+    
+    **Returns**: List of diagnostics
+    
+    **Example**:
+    ```typescript
+    lsp_diagnostics(
+      filePath="src/services/auth.ts",
+      severity="error"
+    )
+    // → [
+    //   {
+    //     message: "Type 'string | undefined' is not assignable to type 'string'",
+    //     severity: "error",
+    //     range: { start: { line: 42, character: 15 }, ... }
+    //   }
+    // ]
+    ```
+  </Accordion>
+
+  <Accordion title="lsp_symbols">
+    Search for symbols in a file or workspace.
+    
+    **Parameters**:
+    - `filePath`: File to search (optional for workspace search)
+    - `scope`: "document" or "workspace"
+    - `query`: Search query (optional)
+    - `limit`: Maximum results (default: 100)
+    
+    **Returns**: List of matching symbols
+    
+    **Example**:
+    ```typescript
+    lsp_symbols(
+      scope="workspace",
+      query="AuthService"
+    )
+    // → [
+    //   { name: "AuthService", kind: "class", location: { file: "...", ... } },
+    //   { name: "AuthServiceImpl", kind: "class", location: { file: "...", ... } }
+    // ]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### LSP Usage Patterns
+
+#### Pattern 1: Safe Renaming
+
+```typescript
+// 1. Validate rename is possible
+const validation = lsp_prepare_rename(
+  filePath="src/types/user.ts",
+  line=10,
+  character=13
+)
+
+if (validation.error) {
+  throw new Error(`Cannot rename: ${validation.error}`)
+}
+
+// 2. Find all references first (optional, for reporting)
+const refs = lsp_find_references(
+  filePath="src/types/user.ts",
+  line=10,
+  character=13
+)
+console.log(`Will update ${refs.length} references`)
+
+// 3. Execute rename
+lsp_rename(
+  filePath="src/types/user.ts",
+  line=10,
+  character=13,
+  newName="AuthenticatedUser"
+)
+
+// 4. Verify no new errors
+const diagnostics = lsp_diagnostics(severity="error")
+if (diagnostics.length > 0) {
+  console.warn(`${diagnostics.length} errors after rename`)
+}
+```
+
+#### Pattern 2: Pre-Build Diagnostics
+
+```typescript
+// Check files before marking task complete
+const changedFiles = [
+  "src/services/auth.ts",
+  "src/api/routes.ts",
+  "src/types/user.ts"
+]
+
+for (const file of changedFiles) {
+  const diagnostics = lsp_diagnostics(filePath=file, severity="error")
+  if (diagnostics.length > 0) {
+    console.error(`Errors in ${file}:`)
+    for (const d of diagnostics) {
+      console.error(`  Line ${d.range.start.line}: ${d.message}`)
+    }
+  }
+}
+```
+
+#### Pattern 3: Codebase Navigation
+
+```typescript
+// Trace implementation chain
+const def = lsp_goto_definition(
+  filePath="src/api/routes.ts",
+  line=18,
+  character=25
+)
+
+// Then find all usages of that definition
+const refs = lsp_find_references(
+  filePath=def.file,
+  line=def.line,
+  character=def.character
+)
+
+console.log(`Implementation used in ${refs.length} places`)
+```
+
+### LSP Configuration
+
+LSP servers are managed automatically. No configuration required for TypeScript, JavaScript, Python, Go, Rust, etc.
+
+Custom language servers can be configured via workspace settings.
+
+## AST-Grep Tools
+
+### What is AST-Grep?
+
+AST-Grep (`ast-grep`) is a pattern-based code search and transformation tool that understands syntax trees. Unlike text-based grep, it matches code structure, not just strings.
+
+**Supported Languages** (25 total):
+- JavaScript, TypeScript, TSX
+- Python, Go, Rust
+- Java, Kotlin, Scala
+- C, C++, C#
+- Ruby, PHP, Elixir
+- HTML, CSS, JSON, YAML
+- Swift, Solidity, Lua, Nix
+- Bash, Haskell
+
+### Available AST-Grep Tools
+
+<AccordionGroup>
+  <Accordion title="ast_grep_search">
+    Search for code patterns using AST-aware matching.
+    
+    **Parameters**:
+    - `pattern`: Code pattern to match (using `$VAR` for wildcards)
+    - `lang`: Language ("typescript", "python", "go", etc.)
+    - `paths`: Paths to search (optional)
+    - `globs`: Glob patterns to include (optional)
+    - `context`: Lines of context around matches (default: 2)
+    
+    **Returns**: List of matches with file/line/context
+    
+    **Example**:
+    ```typescript
+    ast_grep_search(
+      pattern="console.log($MSG)",
+      lang="typescript",
+      paths=["src/"],
+      context=1
+    )
+    // Finds all console.log calls in TypeScript files
+    ```
+  </Accordion>
+
+  <Accordion title="ast_grep_replace">
+    Replace code patterns using AST-aware transformation.
+    
+    **Parameters**:
+    - `pattern`: Code pattern to match
+    - `rewrite`: Replacement pattern (using captured variables)
+    - `lang`: Language
+    - `paths`: Paths to modify
+    - `globs`: Glob patterns to include
+    - `dryRun`: Preview changes without applying (default: false)
+    
+    **Returns**: List of files that would be/were modified
+    
+    **Example**:
+    ```typescript
+    ast_grep_replace(
+      pattern="console.log($MSG)",
+      rewrite="logger.info($MSG)",
+      lang="typescript",
+      paths=["src/"],
+      dryRun=true  // Preview first
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### AST-Grep Pattern Syntax
+
+AST-Grep uses `$VARIABLE` syntax for wildcards:
+
+```typescript
+// Match any function call
+$FUNC($ARGS)
+
+// Match any async function
+async function $NAME($PARAMS) { $BODY }
+
+// Match any class method
+class $CLASS {
+  $METHOD($PARAMS) { $BODY }
+}
+
+// Match any import
+import { $IMPORTS } from '$MODULE'
+```
+
+Variables capture matching code:
+- `$FUNC` captures function name
+- `$ARGS` captures arguments
+- `$BODY` captures function body
+- etc.
+
+### AST-Grep Usage Patterns
+
+#### Pattern 1: Find All Usages
+
+```typescript
+// Find all usages of deprecated API
+ast_grep_search(
+  pattern="oldApiCall($ARGS)",
+  lang="typescript",
+  paths=["src/"]
+)
+
+// Then replace with new API
+ast_grep_replace(
+  pattern="oldApiCall($ARGS)",
+  rewrite="newApiCall($ARGS)",
+  lang="typescript",
+  paths=["src/"],
+  dryRun=true  // Preview first
+)
+```
+
+#### Pattern 2: Codebase-Wide Refactor
+
+```typescript
+// Convert all class components to functional
+ast_grep_replace(
+  pattern="class $NAME extends React.Component { render() { return $JSX } }",
+  rewrite="function $NAME() { return $JSX }",
+  lang="tsx",
+  paths=["src/components/"]
+)
+```
+
+#### Pattern 3: Security Audit
+
+```typescript
+// Find all eval calls (security risk)
+ast_grep_search(
+  pattern="eval($CODE)",
+  lang="javascript",
+  paths=["src/"]
+)
+
+// Find all innerHTML assignments (XSS risk)
+ast_grep_search(
+  pattern="$ELEM.innerHTML = $HTML",
+  lang="javascript",
+  paths=["src/"]
+)
+```
+
+#### Pattern 4: Migration Script
+
+```typescript
+// Migrate from old import style
+ast_grep_replace(
+  pattern="import $NAME from '$MODULE'",
+  rewrite="import { $NAME } from '$MODULE'",
+  lang="typescript",
+  paths=["src/"],
+  dryRun=false
+)
+```
+
+### AST-Grep Configuration
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "tools": {
+    "ast_grep": {
+      "timeout_ms": 300000,        // 5 minutes
+      "max_output_bytes": 1048576, // 1 MB
+      "max_matches": 500
+    }
+  }
+}
+```
+
+## Combining LSP and AST-Grep
+
+### Refactoring Workflow
+
+Use AST-Grep for pattern matching, LSP for validation:
+
+```typescript
+// 1. Find all matches with AST-Grep
+const matches = ast_grep_search(
+  pattern="oldFunction($ARGS)",
+  lang="typescript",
+  paths=["src/"]
+)
+
+// 2. For each match, use LSP to find references
+for (const match of matches) {
+  const refs = lsp_find_references(
+    filePath=match.file,
+    line=match.line,
+    character=match.column
+  )
+  console.log(`${match.file}:${match.line} has ${refs.length} references`)
+}
+
+// 3. Apply transformation with AST-Grep
+ast_grep_replace(
+  pattern="oldFunction($ARGS)",
+  rewrite="newFunction($ARGS)",
+  lang="typescript",
+  paths=["src/"]
+)
+
+// 4. Verify with LSP diagnostics
+const errors = lsp_diagnostics(severity="error")
+if (errors.length > 0) {
+  console.error("Refactoring introduced errors!")
+}
+```
+
+## Integration with /refactor Command
+
+The `/refactor` command uses both LSP and AST-Grep:
+
+```bash
+/refactor UserService --scope=module --strategy=safe
+```
+
+Internally:
+1. **LSP**: Find all references to `UserService`
+2. **AST-Grep**: Find patterns like `new UserService()`, `UserService.method()`
+3. **Analysis**: Build dependency graph
+4. **Planning**: Determine refactoring strategy
+5. **Execution**: Apply changes
+6. **Verification**: Run LSP diagnostics + tests
+
+## Troubleshooting
+
+### LSP Server Not Starting
+
+**Symptom**: LSP tools return "Language server not available"
+
+**Solutions**:
+1. Check language server is installed (e.g., `typescript-language-server`)
+2. Verify `tsconfig.json` or equivalent config exists
+3. Check logs in `/tmp/oh-my-opencode.log`
+
+### AST-Grep Pattern Not Matching
+
+**Symptom**: No matches found, but code exists
+
+**Solutions**:
+1. Verify language is correct
+2. Test pattern syntax (use `ast-grep` CLI directly)
+3. Check file extensions in `globs` parameter
+4. Try simpler pattern first
+
+### Rename Failed
+
+**Symptom**: `lsp_rename` returns error
+
+**Solutions**:
+1. Use `lsp_prepare_rename` first to validate
+2. Check symbol is renameable (not external library)
+3. Verify no syntax errors in file
+
+## Performance Considerations
+
+### LSP Operations
+
+- **Fast**: `lsp_goto_definition`, `lsp_prepare_rename`
+- **Medium**: `lsp_find_references`, `lsp_symbols` (document scope)
+- **Slow**: `lsp_symbols` (workspace scope), `lsp_rename` (large projects)
+
+### AST-Grep Operations
+
+- Timeout: 5 minutes default
+- Max matches: 500 default
+- Large codebases: Use `paths` or `globs` to narrow scope
+
+## Best Practices
+
+### For LSP
+
+1. **Always verify**: Use `lsp_prepare_rename` before `lsp_rename`
+2. **Check diagnostics**: After any refactoring
+3. **Narrow scope**: Use file-level operations when possible
+4. **Cache results**: Store symbol locations to avoid repeated lookups
+
+### For AST-Grep
+
+1. **Start specific**: Begin with narrow patterns, expand as needed
+2. **Dry run first**: Always preview with `dryRun=true`
+3. **Test patterns**: Verify pattern matches intended code
+4. **Scope appropriately**: Use `paths` and `globs` to limit search
+
+## Related Topics
+
+- [Hash-Anchored Edits](/features/hash-anchored-edits) - Surgical file editing
+- [/refactor Command](/guides/commands) - Intelligent refactoring workflow
+- [Edit Tool](/api/tools/hashline-edit) - File modification tools

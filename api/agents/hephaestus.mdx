@@ -1,0 +1,246 @@
+---
+title: Hephaestus Agent
+description: Autonomous deep worker for goal-oriented end-to-end task completion
+---
+
+## Overview
+
+Hephaestus is the autonomous deep worker agent, designed for end-to-end task completion without premature stopping. Named after the Greek god of craftsmanship and forge, Hephaestus works methodically to complete complex implementations from start to finish.
+
+**Inspired by**: AmpCode deep mode
+
+## Key Characteristics
+
+- **Mode**: `all` (available as both primary and subagent)
+- **Temperature**: `0.1`
+- **Default Model**: `gpt-5.3-codex` (medium variant)
+- **Cost**: EXPENSIVE
+- **Color**: `#D97706` (Amber)
+
+## Core Competencies
+
+- Autonomous end-to-end task completion
+- Deep exploration before implementation
+- Comprehensive use of explore/librarian agents for context
+- Goal-oriented execution without premature stopping
+- Multi-file complex changes
+
+## Model Fallback Chain
+
+1. **gpt-5.3-codex** (medium) - OpenAI, Venice, OpenCode
+2. **gpt-5.4** (medium) - GitHub Copilot
+
+**Requirement**: Requires one of the following providers to be connected:
+- OpenAI
+- GitHub Copilot
+- Venice
+- OpenCode
+
+## Tool Restrictions
+
+- **Allowed**: Most tools (read, write, edit, bash, grep, glob, LSP, git, etc.)
+- **Denied**: `call_omo_agent` (uses `task` instead)
+- **Question Permission**: `allow`
+
+## Configuration
+
+### Basic Configuration
+
+```json
+{
+  "agents": {
+    "hephaestus": {
+      "model": "gpt-5.3-codex",
+      "variant": "medium"
+    }
+  }
+}
+```
+
+### Category-Based Configuration
+
+Hephaestus supports category-based spawning:
+
+```json
+{
+  "agents": {
+    "hephaestus": {
+      "category": "ultrabrain"
+    }
+  }
+}
+```
+
+### Configuration Options
+
+<ParamField path="agents.hephaestus.model" type="string">
+  Model to use for Hephaestus. Overrides the fallback chain.
+</ParamField>
+
+<ParamField path="agents.hephaestus.variant" type="string" default="medium">
+  Reasoning effort variant: `low`, `medium`, `high`, `max`, or `xhigh`
+</ParamField>
+
+<ParamField path="agents.hephaestus.category" type="string">
+  Category to use as base configuration (e.g., `ultrabrain`, `visual-engineering`)
+</ParamField>
+
+<ParamField path="agents.hephaestus.temperature" type="number" default="0.1">
+  Temperature for response generation (0.0-1.0)
+</ParamField>
+
+<ParamField path="agents.hephaestus.max_tokens" type="number" default="32000">
+  Maximum tokens for responses
+</ParamField>
+
+## Behavioral Philosophy
+
+Hephaestus operates with a **goal-oriented, autonomous** approach:
+
+### Deep Exploration First
+
+1. **Gather comprehensive context** before starting
+2. **Fire multiple explore/librarian agents** to understand patterns
+3. **Read related files** to understand architecture
+4. **Only then begin implementation**
+
+### Autonomous Completion
+
+- Works through tasks without stopping prematurely
+- Handles multi-file changes systematically
+- Verifies work at each major step
+- Continues until goal is fully achieved
+
+### Thorough Investigation
+
+- Uses explore agents for internal codebase patterns
+- Uses librarian agents for external documentation
+- Reads multiple related files for context
+- Validates assumptions before proceeding
+
+## Prompt Variants
+
+Hephaestus has optimized prompts for different model families:
+
+### GPT-5.4 Prompt
+
+Used when model is `gpt-5.4*`:
+- Principle-driven instruction structure
+- Focus on autonomous completion
+- Tool usage optimization for GPT-5.4
+
+### GPT-5.3 Codex Prompt
+
+Used when model is `gpt-5.3-codex*`:
+- Codex-optimized instructions
+- Code-first approach
+- Engineering best practices emphasis
+
+### Default GPT Prompt
+
+Used for other GPT models:
+- General GPT optimization
+- Standard tool usage patterns
+- Balanced exploration and execution
+
+## Usage Examples
+
+### Example 1: Complex Feature Implementation
+
+**User**: Implement user authentication with JWT tokens
+
+**Hephaestus**:
+1. Fires explore agents to find existing auth patterns
+2. Fires librarian agents for JWT best practices
+3. Reads existing user models, middleware, routes
+4. Implements auth middleware
+5. Adds JWT token generation/validation
+6. Updates routes with auth protection
+7. Verifies all changes with lsp_diagnostics
+8. Reports completion
+
+### Example 2: Multi-File Refactoring
+
+**User**: Extract user service logic into a separate module
+
+**Hephaestus**:
+1. Explores codebase structure and module patterns
+2. Identifies all user-related logic across files
+3. Creates new user service module
+4. Moves logic systematically
+5. Updates imports across all affected files
+6. Runs tests to verify no breakage
+7. Confirms completion
+
+### Example 3: Bug Fix with Investigation
+
+**User**: Fix the data race in the cache layer
+
+**Hephaestus**:
+1. Reads cache implementation thoroughly
+2. Identifies race condition points
+3. Explores similar concurrency patterns in codebase
+4. Implements proper locking mechanism
+5. Adds test case for race condition
+6. Verifies fix doesn't break existing tests
+7. Reports fix with explanation
+
+## When to Use Hephaestus
+
+**Use when:**
+- Task requires deep exploration before implementation
+- You want autonomous end-to-end completion
+- Complex multi-file changes needed
+- Implementation requires understanding existing patterns
+- You want thorough investigation before action
+
+**Avoid when:**
+- Simple single-step tasks (use Sisyphus)
+- Tasks requiring user confirmation at each step
+- Orchestration across multiple agents needed (use Atlas)
+- Read-only consultation needed (use Oracle)
+- Quick iterative changes with user guidance
+
+## Key Differences from Sisyphus
+
+| Aspect | Sisyphus | Hephaestus |
+|--------|----------|------------|
+| **Approach** | Strategic delegation | Autonomous execution |
+| **Stops** | After delegation | After completion |
+| **Exploration** | Delegates to explore | Uses explore + implements |
+| **User interaction** | More frequent | Less frequent |
+| **Best for** | Orchestration | Deep work |
+| **Codebase** | Any | Requires understanding |
+
+## Special Behaviors
+
+### GPT Model Optimization
+
+All Hephaestus configurations include:
+- `reasoningEffort: "medium"`
+- Optimized prompts for GPT model families
+- No extended thinking mode (uses native reasoning)
+
+### Environment Context
+
+Hephaestus applies environment context including:
+- Working directory information
+- Git repository status
+- Platform details
+- Date context
+
+### Category Integration
+
+When spawned via category:
+- Inherits category-specific instructions
+- Loads category-recommended skills
+- Follows category constraints
+- Uses category model preferences
+
+## Related Agents
+
+- **Sisyphus**: Main orchestrator with strategic delegation
+- **Atlas**: Todo list executor for structured work
+- **Explore**: Codebase search specialist (used by Hephaestus)
+- **Librarian**: Documentation search (used by Hephaestus)
+- **Oracle**: Read-only consultant for complex decisions

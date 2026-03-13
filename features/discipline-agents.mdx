@@ -1,0 +1,308 @@
+---
+title: Discipline Agents
+description: Sisyphus, Hephaestus, and Prometheus - specialized AI agents for orchestration, deep work, and strategic planning
+---
+
+## Overview
+
+Oh My OpenAgent provides three discipline agents that work together to handle complex development tasks:
+
+- **Sisyphus**: The main orchestrator who plans, delegates, and drives tasks to completion
+- **Hephaestus**: The autonomous deep worker who explores and executes end-to-end
+- **Prometheus**: The strategic planner who questions and builds detailed plans before execution
+
+Each agent is tuned to its model's specific strengths with optimized prompts and tool permissions.
+
+<Note>
+  Anthropic [blocked OpenCode because of us](https://x.com/thdxr/status/2010149530486911014). That's why Hephaestus is called "The Legitimate Craftsman." The irony is intentional.
+</Note>
+
+## Sisyphus - The Orchestrator
+
+**Role**: Main orchestrator with parallel execution capabilities
+
+**Default Model**: `claude-opus-4-6` (max thinking budget)
+
+**Fallback Chain**: `kimi-k2.5` → `gpt-5.4` (medium) → `glm-5` → `big-pickle`
+
+**Core Competencies**:
+- Parsing implicit requirements from explicit requests
+- Adapting to codebase maturity (disciplined vs chaotic)
+- Delegating specialized work to the right subagents
+- Parallel execution for maximum throughput
+- Intent Gate analysis before every action
+
+### When to Use Sisyphus
+
+Sisyphus is your default agent for:
+- **Multi-step tasks** requiring planning and coordination
+- **Complex implementations** that need multiple specialists
+- **Exploratory work** where the approach isn't immediately clear
+- **Refactoring** that affects multiple files or modules
+
+### How Sisyphus Works
+
+```typescript
+// Sisyphus workflow
+1. Intent Gate → Classify request type (trivial/explicit/exploratory/open-ended)
+2. Assess → Evaluate codebase patterns and conventions
+3. Research → Fire explore/librarian agents in parallel (background)
+4. Plan → Create detailed todo list with specific steps
+5. Delegate → Route work to specialists via categories + skills
+6. Verify → Check results and ensure quality
+7. Complete → Mark todos done and report
+```
+
+### Delegation Strategy
+
+Sisyphus delegates using **categories** (what kind of work) + **skills** (what tools/knowledge):
+
+```typescript
+// Frontend work
+task({
+  category: "visual-engineering",
+  load_skills: ["frontend-ui-ux", "playwright"],
+  prompt: "Implement responsive dashboard with chart component"
+})
+
+// Deep research
+task({
+  category: "deep",
+  load_skills: [],
+  prompt: "Investigate memory leak in WebSocket reconnection logic"
+})
+
+// Quick fixes
+task({
+  category: "quick",
+  load_skills: ["git-master"],
+  prompt: "Fix typo in error message and commit"
+})
+```
+
+### Configuration
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-6",
+      "temperature": 0.1,
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 32000
+      }
+    }
+  }
+}
+```
+
+## Hephaestus - The Craftsman
+
+**Role**: Autonomous deep worker for goal-oriented execution
+
+**Default Model**: `gpt-5.3-codex` (medium reasoning effort)
+
+**Fallback Chain**: `gpt-5.4` (medium) on GitHub Copilot
+
+**Philosophy**: Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding.
+
+### When to Use Hephaestus
+
+Hephaestus excels at:
+- **Autonomous implementation** with minimal guidance
+- **Deep research** requiring thorough codebase exploration
+- **End-to-end features** from scratch
+- **Complex debugging** that needs investigation
+
+<Warning>
+  Hephaestus requires a GPT-capable provider. He's optimized for OpenAI's reasoning models and won't run on non-GPT models.
+</Warning>
+
+### How Hephaestus Works
+
+```typescript
+// Hephaestus workflow
+1. Goal Analysis → Understand the true objective
+2. Codebase Exploration → Grep patterns, read examples
+3. Pattern Recognition → Identify conventions and architecture
+4. Planning → Break down into logical steps
+5. Implementation → Execute with attention to existing patterns
+6. Verification → Test and validate results
+```
+
+Unlike Sisyphus, Hephaestus doesn't delegate. He does the work himself, end-to-end.
+
+### Example Usage
+
+```bash
+# Let Hephaestus handle the entire feature
+Implement a rate limiting middleware for our Express API.
+Use Redis for distributed state. Follow existing middleware patterns.
+```
+
+Hephaestus will:
+1. Find existing middleware implementations
+2. Check Redis usage patterns
+3. Design the rate limiter architecture
+4. Implement following your conventions
+5. Add tests matching your test patterns
+6. Verify everything works
+
+### Configuration
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "agents": {
+    "hephaestus": {
+      "model": "openai/gpt-5.3-codex",
+      "reasoningEffort": "medium",
+      "temperature": 0.1
+    }
+  }
+}
+```
+
+## Prometheus - The Planner
+
+**Role**: Strategic planner with interview mode
+
+**Default Model**: `claude-opus-4-6` (max thinking budget)
+
+**Fallback Chain**: `gpt-5.4` (high) → `gemini-3.1-pro`
+
+**Purpose**: Interview-mode strategic planning before any execution. Questions, identifies scope, and builds a detailed plan.
+
+### When to Use Prometheus
+
+Use Prometheus for:
+- **Complex tasks** with unclear requirements
+- **Large refactors** needing strategic planning
+- **New features** where the approach isn't obvious
+- **Architecture decisions** requiring analysis
+
+### How Prometheus Works
+
+```typescript
+// Prometheus workflow
+1. Interview → Ask clarifying questions about goals and constraints
+2. Scope Discovery → Identify ambiguities and edge cases
+3. Plan Construction → Build detailed step-by-step plan
+4. Verification → Have Momus review the plan
+5. Delivery → Output markdown plan file
+```
+
+### The Planning Process
+
+Prometheus follows a structured interview process:
+
+1. **Purpose**: What are we trying to achieve?
+2. **Constraints**: What limits do we have?
+3. **Scope**: What's in/out of scope?
+4. **Ambiguities**: What's unclear?
+5. **Approach**: What strategy should we use?
+6. **Steps**: What's the detailed plan?
+
+### Example Session
+
+```bash
+/start-work
+```
+
+Prometheus will:
+- Ask about your goals
+- Identify potential problems
+- Propose an approach
+- Build a detailed plan
+- Save to `.sisyphus/plans/YYYY-MM-DD-HH-MM-SS.md`
+
+Then Sisyphus (via Atlas) executes the plan systematically.
+
+### Configuration
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "agents": {
+    "prometheus": {
+      "model": "anthropic/claude-opus-4-6",
+      "temperature": 0.1,
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 32000
+      }
+    }
+  }
+}
+```
+
+## Agent Comparison
+
+| Aspect | Sisyphus | Hephaestus | Prometheus |
+|--------|----------|------------|------------|
+| **Purpose** | Orchestration | Autonomous work | Strategic planning |
+| **Model** | Claude Opus 4 | GPT-5.3 Codex | Claude Opus 4 |
+| **Temperature** | 0.1 | 0.1 | 0.1 |
+| **Can Delegate** | ✅ Yes | ❌ No | ❌ No |
+| **Tool Access** | All tools | All tools | Read-only + Write |
+| **Best For** | Complex multi-step tasks | Deep autonomous work | Planning before execution |
+| **Thinking** | 32k tokens | Reasoning effort | 32k tokens |
+
+## The Discipline Agent Philosophy
+
+> "If Claude Code does in 7 days what a human does in 3 months, Sisyphus does it in 1 hour. It just works until the task is done. It is a discipline agent." - B, Quant Researcher
+
+Discipline agents don't stop halfway. They:
+
+1. **Plan obsessively** with detailed todo lists
+2. **Parallelize everything** - fire multiple agents simultaneously
+3. **Verify relentlessly** - check results before marking complete
+4. **Recover gracefully** - fallback on errors, consult Oracle on repeated failures
+5. **Complete thoroughly** - evidence required (diagnostics, tests, builds)
+
+<Tip>
+  The todo continuation hook tracks agent progress. If an agent goes idle with incomplete todos, the system yanks it back to work.
+</Tip>
+
+## Advanced Usage
+
+### Combining Agents
+
+Sisyphus automatically invokes Prometheus when using `/start-work`:
+
+```bash
+# 1. Plan with Prometheus
+/start-work
+
+# 2. Execute with Atlas (Sisyphus-powered)
+# Plan loads automatically and executes systematically
+```
+
+### Parallel Background Execution
+
+Sisyphus fires explore/librarian agents in parallel:
+
+```typescript
+// Sisyphus launches multiple background agents
+task(subagent_type="explore", run_in_background=true, prompt="Find auth patterns")
+task(subagent_type="explore", run_in_background=true, prompt="Find error handling")
+task(subagent_type="librarian", run_in_background=true, prompt="JWT security best practices")
+
+// Continues with other work while agents run
+// System notifies when each completes
+```
+
+### Disabling Agents
+
+If you prefer not to use certain agents:
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "disabled_agents": ["prometheus", "hephaestus"]
+}
+```
+
+## Related Topics
+
+- [Background Agents](/features/background-agents) - Parallel task execution
+- [Category System](/api/config/categories) - Task delegation via categories
+- [Skills](/guides/skills) - Specialized knowledge and tools

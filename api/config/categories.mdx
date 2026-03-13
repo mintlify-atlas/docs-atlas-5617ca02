@@ -1,0 +1,436 @@
+---
+title: "Categories"
+description: "Configure categories with model defaults, tools, and settings for agent inheritance"
+---
+
+## Overview
+
+Categories provide reusable configuration templates for agents. Each category defines model defaults, temperature, tools, and other settings that agents inherit when assigned to that category.
+
+Defined in `src/config/schema/categories.ts`
+
+## Built-in Categories
+
+8 built-in categories are available:
+
+- `visual-engineering` - Visual design and UI/UX tasks
+- `ultrabrain` - Complex reasoning and orchestration
+- `deep` - Deep analysis and research
+- `artistry` - Creative and design work
+- `quick` - Fast execution tasks
+- `unspecified-low` - Low-priority unspecified tasks
+- `unspecified-high` - High-priority unspecified tasks
+- `writing` - Writing and documentation
+
+## Custom Categories
+
+You can define custom categories in addition to the built-in ones:
+
+```json
+{
+  "categories": {
+    "my-custom-category": {
+      "model": "anthropic/claude-sonnet-4",
+      "temperature": 0.7,
+      "description": "Custom category for specialized tasks"
+    }
+  }
+}
+```
+
+## CategoryConfig Fields
+
+<ParamField path="description" type="string" optional>
+  Human-readable description of the category's purpose
+  
+  Shown in task prompt to help agent selection
+  
+  ```json
+  {
+    "categories": {
+      "ultrabrain": {
+        "description": "Complex reasoning, orchestration, and multi-step planning"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="model" type="string" optional>
+  Default model for this category
+  
+  Format: `provider/model-name` (e.g., `anthropic/claude-opus-4-5`)
+  
+  ```json
+  {
+    "categories": {
+      "ultrabrain": {
+        "model": "anthropic/claude-opus-4-5"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="fallback_models" type="string | string[]" optional>
+  Fallback model(s) when primary model fails
+  
+  Can be a single model string or array of models
+  
+  ```json
+  {
+    "categories": {
+      "ultrabrain": {
+        "fallback_models": [
+          "openai/gpt-5.4",
+          "google/gemini-3-pro",
+          "github-copilot/gpt-4"
+        ]
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="variant" type="string" optional>
+  Model variant (e.g., dated versions)
+  
+  ```json
+  {
+    "categories": {
+      "ultrabrain": {
+        "model": "anthropic/claude-opus-4-5",
+        "variant": "20250514"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="temperature" type="number" optional>
+  Sampling temperature (0.0 to 2.0)
+  
+  Lower values = more deterministic, higher values = more creative
+  
+  ```json
+  {
+    "categories": {
+      "quick": {
+        "temperature": 0.5
+      },
+      "artistry": {
+        "temperature": 1.2
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="top_p" type="number" optional>
+  Nucleus sampling parameter (0.0 to 1.0)
+  
+  ```json
+  {
+    "categories": {
+      "ultrabrain": {
+        "top_p": 0.95
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="maxTokens" type="number" optional>
+  Maximum tokens for response
+  
+  ```json
+  {
+    "categories": {
+      "deep": {
+        "maxTokens": 16000
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="thinking" type="object" optional>
+  Extended thinking configuration (Anthropic)
+  
+  ```json
+  {
+    "categories": {
+      "deep": {
+        "thinking": {
+          "type": "enabled",
+          "budgetTokens": 10000
+        }
+      }
+    }
+  }
+  ```
+  
+  <ParamField path="thinking.type" type="enum" required>
+    `enabled` or `disabled`
+  </ParamField>
+  
+  <ParamField path="thinking.budgetTokens" type="number" optional>
+    Token budget for thinking
+  </ParamField>
+</ParamField>
+
+<ParamField path="reasoningEffort" type="enum" optional>
+  Reasoning effort level (OpenAI)
+  
+  Values: `low`, `medium`, `high`, `xhigh`
+  
+  ```json
+  {
+    "categories": {
+      "deep": {
+        "reasoningEffort": "high"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="textVerbosity" type="enum" optional>
+  Text verbosity level
+  
+  Values: `low`, `medium`, `high`
+  
+  ```json
+  {
+    "categories": {
+      "quick": {
+        "textVerbosity": "low"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="tools" type="Record<string, boolean>" optional>
+  Enable/disable specific tools for this category
+  
+  ```json
+  {
+    "categories": {
+      "quick": {
+        "tools": {
+          "todowrite": false,
+          "bash": true
+        }
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="prompt_append" type="string" optional>
+  Text to append to prompts for agents using this category
+  
+  Supports file:// URIs:
+  - `file:///absolute/path`
+  - `file://./relative/path`
+  - `file://~/home/relative`
+  
+  ```json
+  {
+    "categories": {
+      "artistry": {
+        "prompt_append": "Focus on visual design principles and user experience."
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="max_prompt_tokens" type="number" optional>
+  Maximum prompt tokens (positive integer)
+  
+  ```json
+  {
+    "categories": {
+      "quick": {
+        "max_prompt_tokens": 4000
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="is_unstable_agent" type="boolean" optional>
+  Mark agent as unstable - forces background mode for monitoring
+  
+  Auto-enabled for gemini/minimax models
+  
+  ```json
+  {
+    "categories": {
+      "experimental": {
+        "is_unstable_agent": true
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="disable" type="boolean" optional>
+  Disable this category
+  
+  Disabled categories are excluded from task delegation
+  
+  ```json
+  {
+    "categories": {
+      "visual-engineering": {
+        "disable": true
+      }
+    }
+  }
+  ```
+</ParamField>
+
+## Complete Example
+
+```json
+{
+  "categories": {
+    "ultrabrain": {
+      "description": "Complex reasoning, orchestration, and multi-step planning",
+      "model": "anthropic/claude-opus-4-5",
+      "variant": "20250514",
+      "fallback_models": [
+        "openai/gpt-5.4",
+        "google/gemini-3-pro"
+      ],
+      "temperature": 0.8,
+      "top_p": 0.95,
+      "maxTokens": 8000,
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 10000
+      },
+      "textVerbosity": "medium",
+      "tools": {
+        "task": true,
+        "todowrite": true
+      }
+    },
+    "quick": {
+      "description": "Fast execution for simple tasks",
+      "model": "anthropic/claude-sonnet-4",
+      "fallback_models": "anthropic/claude-haiku-4",
+      "temperature": 0.5,
+      "maxTokens": 4000,
+      "max_prompt_tokens": 4000,
+      "textVerbosity": "low",
+      "tools": {
+        "todowrite": false
+      }
+    },
+    "deep": {
+      "description": "Deep analysis and research",
+      "model": "openai/gpt-5.4",
+      "reasoningEffort": "high",
+      "temperature": 0.7,
+      "maxTokens": 16000,
+      "textVerbosity": "high"
+    },
+    "artistry": {
+      "description": "Creative design and visual work",
+      "model": "anthropic/claude-sonnet-4",
+      "temperature": 1.2,
+      "prompt_append": "Focus on aesthetics, user experience, and visual design principles."
+    },
+    "my-custom-category": {
+      "description": "Custom category for specialized tasks",
+      "model": "anthropic/claude-sonnet-4",
+      "temperature": 0.7,
+      "fallback_models": ["github-copilot/gpt-4"]
+    }
+  }
+}
+```
+
+## Category-Model Requirements
+
+Some categories have specific model requirements defined in `src/tools/delegate-task/constants.ts`:
+
+- **visual-engineering**: Requires vision-capable models (Gemini, GPT-4V, Claude with vision)
+- **ultrabrain**: Prefers Claude Opus, OpenAI GPT-5, or Gemini Pro
+- **deep**: Requires reasoning-capable models (OpenAI o1, o4-mini)
+
+## Using Categories with Agents
+
+Agents inherit category settings:
+
+```json
+{
+  "categories": {
+    "ultrabrain": {
+      "model": "anthropic/claude-opus-4-5",
+      "temperature": 0.8
+    }
+  },
+  "agents": {
+    "sisyphus": {
+      "category": "ultrabrain"
+    },
+    "hephaestus": {
+      "category": "quick"
+    }
+  }
+}
+```
+
+Agent-specific overrides take precedence:
+
+```json
+{
+  "categories": {
+    "ultrabrain": {
+      "model": "anthropic/claude-opus-4-5",
+      "temperature": 0.8
+    }
+  },
+  "agents": {
+    "sisyphus": {
+      "category": "ultrabrain",
+      "temperature": 0.9  // Overrides category temperature
+    }
+  }
+}
+```
+
+## TypeScript Types
+
+```typescript
+import type { CategoryConfig, CategoriesConfig, BuiltinCategoryName } from "oh-my-opencode"
+
+const category: CategoryConfig = {
+  model: "anthropic/claude-opus-4-5",
+  temperature: 0.8,
+  thinking: {
+    type: "enabled",
+    budgetTokens: 10000
+  }
+}
+
+const allCategories: CategoriesConfig = {
+  ultrabrain: category,
+  quick: {
+    model: "anthropic/claude-sonnet-4",
+    temperature: 0.5
+  }
+}
+
+const builtinName: BuiltinCategoryName = "ultrabrain"
+```
+
+## Related
+
+- [Configuration Schema](/api/config/schema)
+- [Agent Overrides](/api/config/agents)

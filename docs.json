@@ -1,122 +1,166 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Oh My OpenAgent",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#04bfde",
+    "light": "#0e1517",
+    "dark": "#c5c5c5"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.png",
+  "logo": {
+    "light": "/logo.png",
+    "dark": "/logo.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/code-yeongyu/oh-my-openagent"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/code-yeongyu/oh-my-openagent",
+      "discord": "https://discord.gg/PUwSMR9XNk",
+      "x": "https://x.com/justsisyphus"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/overview",
+              "concepts/agents",
+              "concepts/orchestration",
+              "concepts/ultrawork"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/agent-model-matching",
+              "guides/configuration",
+              "guides/skills",
+              "guides/commands",
+              "guides/hooks"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Features",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "features/discipline-agents",
+              "features/background-agents",
+              "features/hash-anchored-edits",
+              "features/lsp-ast-tools",
+              "features/built-in-mcps",
+              "features/skill-embedded-mcps",
+              "features/tmux-integration",
+              "features/claude-code-compatibility"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/deep-initialization",
+              "advanced/prometheus-planner",
+              "advanced/ralph-loop",
+              "advanced/todo-enforcer",
+              "advanced/comment-checker"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/doctor-checks"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Agents",
             "pages": [
-              "api-reference/introduction"
+              "api/agents/sisyphus",
+              "api/agents/hephaestus",
+              "api/agents/prometheus",
+              "api/agents/oracle",
+              "api/agents/librarian",
+              "api/agents/explore",
+              "api/agents/atlas",
+              "api/agents/metis",
+              "api/agents/momus",
+              "api/agents/multimodal-looker"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Tools",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/tools/overview",
+              "api/tools/lsp",
+              "api/tools/ast-grep",
+              "api/tools/hashline-edit",
+              "api/tools/background-task",
+              "api/tools/session-manager"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "api/hooks/overview",
+              "api/hooks/session-hooks",
+              "api/hooks/tool-guard-hooks",
+              "api/hooks/transform-hooks",
+              "api/hooks/continuation-hooks"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/config/schema",
+              "api/config/agents",
+              "api/config/categories",
+              "api/config/experimental"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "api/cli/install",
+              "api/cli/run",
+              "api/cli/doctor",
+              "api/cli/mcp-oauth"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Community",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "community/manifesto",
+              "community/contributing",
+              "community/cla"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

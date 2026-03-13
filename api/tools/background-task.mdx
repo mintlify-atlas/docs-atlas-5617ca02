@@ -1,0 +1,351 @@
+---
+title: Background Task Tools
+description: Manage and monitor long-running background agent tasks
+---
+
+## Overview
+
+Background Task tools provide the LLM-facing interface for managing long-running agent tasks that execute in separate sessions. The actual execution engine lives in `src/features/background-agent/` — these tools are the query layer.
+
+## Available Tools
+
+### background_output
+
+Get results from a running or completed background task.
+
+<ParamField path="task_id" type="string" required>
+  Task ID returned when task was created
+</ParamField>
+
+<ParamField path="block" type="boolean">
+  Wait for task completion (default: false)
+</ParamField>
+
+<ParamField path="timeout" type="number">
+  Timeout in seconds when blocking (default: 120)
+</ParamField>
+
+<ParamField path="full_session" type="boolean">
+  Return full session transcript instead of result summary (default: false)
+</ParamField>
+
+<ParamField path="include_thinking" type="boolean">
+  Include thinking blocks in output (default: false)
+</ParamField>
+
+<ParamField path="message_limit" type="number">
+  Limit number of messages returned (default: all)
+</ParamField>
+
+<ParamField path="since_message_id" type="string">
+  Return only messages after this ID (for incremental polling)
+</ParamField>
+
+<ParamField path="thinking_max_chars" type="number">
+  Max characters per thinking block (default: 500)
+</ParamField>
+
+**Returns:** Task status and results (or full transcript)
+
+**Examples:**
+
+```typescript
+// Quick status check (non-blocking)
+background_output({
+  task_id: "task_abc123"
+})
+
+// Wait for completion (blocking)
+background_output({
+  task_id: "task_abc123",
+  block: true,
+  timeout: 300  // 5 minutes
+})
+
+// Get full session transcript
+background_output({
+  task_id: "task_abc123",
+  full_session: true,
+  include_thinking: true
+})
+
+// Incremental polling
+background_output({
+  task_id: "task_abc123",
+  since_message_id: "msg_xyz789",
+  message_limit: 10
+})
+```
+
+### background_cancel
+
+Cancel running background task(s).
+
+<ParamField path="taskId" type="string">
+  Task ID to cancel (required if all=false)
+</ParamField>
+
+<ParamField path="all" type="boolean">
+  Cancel all running tasks (default: false)
+</ParamField>
+
+**Returns:** Confirmation of cancellation
+
+**Examples:**
+
+```typescript
+// Cancel specific task
+background_cancel({
+  taskId: "task_abc123"
+})
+
+// Cancel all running tasks
+background_cancel({
+  all: true
+})
+```
+
+## Task Status Types
+
+### Running
+
+```json
+{
+  "status": "running",
+  "task_id": "task_abc123",
+  "created_at": "2026-03-13T10:30:00Z",
+  "elapsed_seconds": 45
+}
+```
+
+### Completed
+
+```json
+{
+  "status": "completed",
+  "task_id": "task_abc123",
+  "created_at": "2026-03-13T10:30:00Z",
+  "completed_at": "2026-03-13T10:32:15Z",
+  "elapsed_seconds": 135,
+  "result": "Task completed successfully. 3 files modified."
+}
+```
+
+### Error
+
+```json
+{
+  "status": "error",
+  "task_id": "task_abc123",
+  "error": "TypeError: Cannot read property 'foo' of undefined",
+  "elapsed_seconds": 12
+}
+```
+
+## Output Modes
+
+### Summary Mode (default)
+
+Returns condensed task result:
+- Task status
+- Final output/result
+- Error messages (if any)
+- Elapsed time
+
+```typescript
+background_output({ task_id: "task_abc123" })
+```
+
+### Full Session Mode
+
+Returns complete session transcript:
+- All messages (user + assistant)
+- Tool calls and results
+- Thinking blocks (optional)
+- Full conversation history
+
+```typescript
+background_output({
+  task_id: "task_abc123",
+  full_session: true,
+  include_thinking: true
+})
+```
+
+### Incremental Polling Mode
+
+Get only new messages since last check:
+
+```typescript
+let lastMessageId = null
+
+// First poll
+const result1 = background_output({
+  task_id: "task_abc123",
+  message_limit: 10
+})
+lastMessageId = result1.last_message_id
+
+// Subsequent polls (only new messages)
+const result2 = background_output({
+  task_id: "task_abc123",
+  since_message_id: lastMessageId,
+  message_limit: 10
+})
+```
+
+## Blocking vs Non-Blocking
+
+### Non-Blocking (default)
+
+Returns immediately with current status:
+
+```typescript
+background_output({ task_id: "task_abc123" })
+// Returns: { status: "running", elapsed_seconds: 45 }
+```
+
+### Blocking
+
+Waits for task completion (up to timeout):
+
+```typescript
+background_output({
+  task_id: "task_abc123",
+  block: true,
+  timeout: 300
+})
+// Waits up to 5 minutes, then returns result
+```
+
+## Implementation Details
+
+### Polling Mechanism
+
+When blocking, polls task status every 2 seconds:
+
+```typescript
+while (elapsed < timeout) {
+  const status = await checkStatus()
+  if (status.completed) return status
+  await delay(2000)  // 2s polling interval
+}
+throw new Error("Timeout")
+```
+
+### Concurrency Limits
+
+Background Manager enforces limits:
+- **5 concurrent tasks per model/provider** (configurable)
+- Tasks queued when limit reached
+- Fair scheduling across providers
+
+### Message Storage
+
+Messages exchanged via temp directory:
+- Location: `/tmp/opencode-background-messages/`
+- Cleaned up on task completion
+- JSON format for structured data
+
+## Relationship to Background Engine
+
+```
+tools/background-task/  ← LLM tool interface (this)
+  ↓ queries
+features/background-agent/  ← Execution engine
+  - BackgroundManager
+  - Task scheduling
+  - Session management
+  - Result collection
+```
+
+## Configuration
+
+Configure background task behavior:
+
+```json
+{
+  "background_task": {
+    "syncPollTimeoutMs": 120000,  // 2 minutes
+    "maxConcurrentPerModel": 5,
+    "defaultTimeout": 120
+  }
+}
+```
+
+## Common Patterns
+
+### Create and Wait
+
+```typescript
+// Create background task (via task or call_omo_agent)
+const result = await task({
+  description: "Analyze codebase",
+  prompt: "Generate architecture diagram",
+  run_in_background: true
+})
+
+const taskId = result.task_id
+
+// Wait for completion
+const output = await background_output({
+  task_id: taskId,
+  block: true,
+  timeout: 600
+})
+```
+
+### Poll Until Complete
+
+```typescript
+let status = await background_output({ task_id: taskId })
+
+while (status.status === "running") {
+  await sleep(5000)  // Wait 5 seconds
+  status = await background_output({ task_id: taskId })
+}
+
+console.log("Task completed:", status.result)
+```
+
+### Cancel on Timeout
+
+```typescript
+try {
+  const result = await background_output({
+    task_id: taskId,
+    block: true,
+    timeout: 300
+  })
+} catch (error) {
+  if (error.message.includes("timeout")) {
+    await background_cancel({ taskId })
+  }
+}
+```
+
+## Error Handling
+
+### Task Not Found
+
+```
+Error: Task not found: task_abc123
+```
+
+### Timeout
+
+```
+Error: Task timed out after 120 seconds
+```
+
+### Cancellation
+
+```
+Task was cancelled by user
+```
+
+## Related Documentation
+
+- [Tools Overview](/api/tools/overview)
+- [Session Manager](/api/tools/session-manager)
+- [Hooks Overview](/api/hooks/overview)

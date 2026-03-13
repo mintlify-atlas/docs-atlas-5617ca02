@@ -1,0 +1,313 @@
+---
+title: Explore Agent
+description: Contextual grep specialist for internal codebase search and discovery
+---
+
+## Overview
+
+Explore is a specialized codebase search agent that answers "Where is X?", "Which file has Y?", and "Find the code that does Z" questions. It performs contextual grep operations across your local codebase with intelligent parallel search strategies.
+
+**Philosophy**: Find ALL relevant matches, return actionable results with absolute paths.
+
+## Key Characteristics
+
+- **Mode**: `subagent` (invoked by other agents)
+- **Temperature**: `0.1`
+- **Default Model**: `grok-code-fast-1`
+- **Cost**: FREE
+
+## Core Competencies
+
+- Internal codebase pattern discovery
+- Cross-layer pattern searching
+- Multi-angle parallel search
+- File and code location
+- Structural and semantic search
+
+## Model Fallback Chain
+
+1. **grok-code-fast-1** - GitHub Copilot
+2. **minimax-m2.5** - OpenCode Go
+3. **minimax-m2.5-free** - OpenCode
+4. **claude-haiku-4-5** - Anthropic, OpenCode
+5. **gpt-5-nano** - OpenCode
+
+## Tool Restrictions
+
+**Read-only search agent**:
+
+- **Allowed**: `read`, `grep`, `glob`, `bash` (read-only), `lsp_*`, `ast_grep_*`, `git` (read ops)
+- **Denied**: `write`, `edit`, `apply_patch`, `task`, `call_omo_agent`
+
+## Configuration
+
+### Basic Configuration
+
+```json
+{
+  "agents": {
+    "explore": {
+      "model": "grok-code-fast-1"
+    }
+  }
+}
+```
+
+### Configuration Options
+
+<ParamField path="agents.explore.model" type="string">
+  Model to use for Explore. Overrides the fallback chain.
+</ParamField>
+
+<ParamField path="agents.explore.temperature" type="number" default="0.1">
+  Temperature for response generation (0.0-1.0)
+</ParamField>
+
+## Required Output Format
+
+Explore MUST deliver three sections in every response:
+
+### 1. Intent Analysis (Required)
+
+Before ANY search, wrap analysis in `<analysis>` tags:
+
+```xml
+<analysis>
+**Literal Request**: [What they literally asked]
+**Actual Need**: [What they're really trying to accomplish]
+**Success Looks Like**: [What result would let them proceed immediately]
+</analysis>
+```
+
+### 2. Parallel Execution (Required)
+
+Launch **3+ tools simultaneously** in first action. Never sequential unless output depends on prior result.
+
+### 3. Structured Results (Required)
+
+```xml
+<results>
+<files>
+- /absolute/path/to/file1.ts — [why this file is relevant]
+- /absolute/path/to/file2.ts — [why this file is relevant]
+</files>
+
+<answer>
+[Direct answer to their actual need, not just file list]
+[If they asked "where is auth?", explain the auth flow you found]
+</answer>
+
+<next_steps>
+[What they should do with this information]
+[Or: "Ready to proceed - no follow-up needed"]
+</next_steps>
+</results>
+```
+
+## Success Criteria
+
+A search is successful when:
+
+- **Paths**: ALL paths are **absolute** (start with `/`)
+- **Completeness**: Found ALL relevant matches, not just the first
+- **Actionability**: Caller can proceed **without follow-up questions**
+- **Intent**: Addressed **actual need**, not just literal request
+
+## Failure Conditions
+
+Response has **FAILED** if:
+
+- Any path is relative (not absolute)
+- Missed obvious matches in the codebase
+- Caller needs to ask "but where exactly?" or "what about X?"
+- Only answered literal question, not underlying need
+- No `<results>` block with structured output
+
+## Tool Strategy
+
+Use the right tool for the job:
+
+- **Semantic search** (definitions, references): LSP tools (`lsp_find_references`, `lsp_find_type_definition`)
+- **Structural patterns** (function shapes, class structures): `ast_grep_search`
+- **Text patterns** (strings, comments, logs): `grep`
+- **File patterns** (find by name/extension): `glob`
+- **History/evolution** (when added, who changed): `git log`, `git blame`
+
+**Strategy**: Flood with parallel calls. Cross-validate findings across multiple tools.
+
+## Thoroughness Levels
+
+Caller can specify thoroughness:
+
+- **"quick"**: Basic search, first-pass results
+- **"medium"**: Moderate depth, cross-validate with 2-3 tools
+- **"very thorough"**: Comprehensive analysis, use all relevant tools
+
+## Usage Examples
+
+### Example 1: Find Authentication Implementation
+
+**Query**: Where is authentication implemented?
+
+**Explore**:
+
+```xml
+<analysis>
+**Literal Request**: Find authentication code
+**Actual Need**: Understand auth flow to add new auth feature
+**Success Looks Like**: Clear map of auth components and their responsibilities
+</analysis>
+```
+
+*Fires in parallel*:
+1. `grep -r "authenticate" src/`
+2. `ast_grep_search "function.*auth"` 
+3. `lsp_find_references` for AuthService
+4. `git log --grep="auth" --oneline -20`
+
+```xml
+<results>
+<files>
+- /home/user/project/src/auth/middleware.ts — Express middleware for JWT validation
+- /home/user/project/src/auth/service.ts — AuthService class with login/signup methods
+- /home/user/project/src/auth/strategies/jwt.ts — JWT token generation and verification
+- /home/user/project/src/routes/auth.ts — Auth route handlers (POST /login, /signup)
+</files>
+
+<answer>
+Auth flow: Client sends credentials to /auth/login → auth.ts route handler → AuthService.login() validates → jwt.ts generates token → middleware.ts validates token on protected routes.
+
+Core components:
+- AuthService: Business logic (validation, user lookup)
+- JWT strategy: Token lifecycle
+- Middleware: Request protection
+- Routes: HTTP endpoints
+</answer>
+
+<next_steps>
+Ready to proceed - you now have the auth flow mapped. Add your feature by extending AuthService or creating a new strategy.
+</next_steps>
+</results>
+```
+
+### Example 2: Find Usage of Specific Function
+
+**Query**: Where is `calculateTax` used?
+
+**Explore**:
+
+*Fires in parallel*:
+1. `lsp_find_references` for calculateTax
+2. `grep -r "calculateTax" src/`
+3. `ast_grep_search "calculateTax("`
+
+```xml
+<results>
+<files>
+- /home/user/project/src/billing/invoice.ts:45 — Called in Invoice.calculateTotal()
+- /home/user/project/src/billing/receipt.ts:78 — Called in Receipt.generatePDF()
+- /home/user/project/src/reports/tax-report.ts:23 — Called in TaxReport.generateAnnual()
+</files>
+
+<answer>
+calculateTax() is used in 3 places, all in billing/reporting:
+1. Invoice total calculation
+2. Receipt PDF generation  
+3. Annual tax report
+
+All usages follow same pattern: calculateTax(amount, jurisdiction)
+</answer>
+
+<next_steps>
+If you're modifying calculateTax, these 3 files need testing after your change.
+</next_steps>
+</results>
+```
+
+### Example 3: Find Pattern Across Modules
+
+**Query**: Find all database query patterns
+
+**Explore**:
+
+*Fires in parallel*:
+1. `grep -r "db.query" src/`
+2. `grep -r "SELECT.*FROM" src/`
+3. `ast_grep_search "await.*query"`
+4. `glob "**/*repository.ts"`
+
+```xml
+<results>
+<files>
+- /home/user/project/src/repositories/user-repository.ts — 12 queries using repository pattern
+- /home/user/project/src/repositories/order-repository.ts — 8 queries using repository pattern
+- /home/user/project/src/services/legacy-service.ts — 3 raw SQL queries (deprecated pattern)
+</files>
+
+<answer>
+Two patterns found:
+1. **Current (repository)**: 90% of codebase uses Repository pattern with typed methods
+2. **Legacy (raw SQL)**: 10% has direct db.query() calls (being migrated)
+
+Follow repository pattern for new code. See user-repository.ts:15-30 for template.
+</answer>
+
+<next_steps>
+Use repository pattern. Avoid direct db.query(). Check .sisyphus/rules/ for migration guide.
+</next_steps>
+</results>
+```
+
+## When to Use Explore
+
+**Use when:**
+- Multiple search angles needed
+- Unfamiliar module structure
+- Cross-layer pattern discovery
+- Finding all usages of a pattern
+- Understanding existing architecture
+
+**Avoid when:**
+- You know exactly what to search (use grep/glob directly)
+- Single keyword/pattern suffices
+- Known file location
+- Searching external dependencies (use Librarian)
+
+## Prompt Structure for Delegation
+
+When delegating to Explore, provide context:
+
+```typescript
+// Good delegation structure:
+task(
+  subagent_type="explore",
+  run_in_background=true,
+  description="Find auth implementations",
+  prompt="[CONTEXT]: I'm implementing JWT auth for REST API in src/api/routes/
+  
+[GOAL]: Match existing auth conventions for seamless integration
+
+[DOWNSTREAM]: Will use this to decide middleware structure and token flow
+
+[REQUEST]: Find:
+- Auth middleware
+- Login/signup handlers  
+- Token generation
+- Credential validation
+
+Focus on src/ — skip tests. Return file paths with pattern descriptions."
+)
+```
+
+**Prompt sections**:
+- **CONTEXT**: What task you're working on, which files/modules involved
+- **GOAL**: Specific outcome needed, what decision results will unblock
+- **DOWNSTREAM**: How you'll use results, what you'll build/decide
+- **REQUEST**: Concrete search instructions, what to find, what format, what to SKIP
+
+## Related Agents
+
+- **Librarian**: Searches external docs/code (Explore searches internal)
+- **Sisyphus**: Delegates to Explore for codebase understanding
+- **Hephaestus**: Uses Explore for comprehensive context before implementation
+- **Oracle**: May use Explore results for architectural analysis

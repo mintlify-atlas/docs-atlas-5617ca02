@@ -1,0 +1,493 @@
+---
+title: Session Hooks
+description: Hooks for session lifecycle, context window, and agent behavior management
+---
+
+## Overview
+
+Session hooks (24 total) manage the agent session lifecycle, context window usage, model selection, and session-specific behaviors. These hooks execute on session events like `session.created`, `session.idle`, `session.error`, and more.
+
+## Context Window Management
+
+### context-window-monitor
+
+Tracks context window usage percentage and triggers warnings.
+
+**When it executes:** `session.idle`
+
+**What it does:**
+- Calculates current context usage (tokens / max tokens)
+- Logs warnings at 50%, 75%, 90%, 95% thresholds
+- Triggers preemptive compaction if enabled
+
+**Configuration:**
+```json
+{
+  "experimental": {
+    "context_window_monitor": true
+  }
+}
+```
+
+### preemptive-compaction
+
+Triggers compaction before hitting context limit.
+
+**When it executes:** `session.idle`
+
+**What it does:**
+- Monitors context usage via context-window-monitor
+- Triggers compaction at 85% threshold
+- Prevents hitting hard context limits
+
+**Configuration:**
+```json
+{
+  "experimental": {
+    "preemptive_compaction": true
+  }
+}
+```
+
+### anthropic-context-window-limit-recovery
+
+Multi-strategy recovery when hitting Anthropic context limits.
+
+**When it executes:** `session.error` (on context limit errors)
+
+**What it does:**
+1. **Truncation:** Remove old messages from beginning
+2. **Compaction:** Summarize middle section of conversation
+3. **Summarization:** Condense tool outputs and repeated content
+4. **Deduplication:** Remove duplicate messages
+
+**Strategies applied in order:**
+- Empty content recovery
+- Aggressive truncation (remove oldest 30%)
+- Compaction (summarize middle 50%)
+- Deduplication (remove exact duplicates)
+
+**Configuration:**
+```json
+{
+  "experimental": {
+    "anthropic_context_recovery": {
+      "enabled": true,
+      "strategies": ["truncation", "compaction", "summarization"]
+    }
+  }
+}
+```
+
+## Model Management
+
+### think-mode
+
+Dynamically adjusts thinking budget based on task complexity.
+
+**When it executes:** `chat.params`
+
+**What it does:**
+- Detects extended thinking requests
+- Switches to model variants (e.g., `claude-sonnet-4.5-thinking-2026-03-20`)
+- Adjusts token budgets for reasoning
+
+**Configuration:**
+```json
+{
+  "think_mode": {
+    "enabled": true,
+    "default_budget": 10000  // Thinking tokens
+  }
+}
+```
+
+### model-fallback
+
+Provider-level model fallback on errors.
+
+**When it executes:** `chat.params`
+
+**What it does:**
+- Detects model errors (rate limits, unavailability)
+- Falls back to alternative provider
+- Updates session title with fallback info (optional)
+
+**Fallback priority:**
+1. Claude (Anthropic)
+2. OpenAI (GPT)
+3. Gemini (Google)
+4. Copilot (GitHub)
+5. OpenCode Zen
+6. Z.ai
+7. Kimi
+
+**Configuration:**
+```json
+{
+  "model_fallback": true,
+  "experimental": {
+    "model_fallback_title": true  // Update title on fallback
+  }
+}
+```
+
+### anthropic-effort
+
+Adjusts Anthropic reasoning effort level based on task.
+
+**When it executes:** `chat.params`
+
+**What it does:**
+- Detects task complexity keywords
+- Sets `reasoning_effort` parameter (low/medium/high)
+- Controls how much the model "thinks" before responding
+
+**Effort levels:**
+- `low`: Quick responses
+- `medium`: Balanced (default)
+- `high`: Deep reasoning
+
+**Configuration:**
+```json
+{
+  "anthropic_effort": {
+    "enabled": true,
+    "default": "medium"
+  }
+}
+```
+
+### runtime-fallback
+
+Auto-switch models on API provider errors.
+
+**When it executes:** `event` (on API errors)
+
+**What it does:**
+- Detects provider outages, rate limits, auth errors
+- Switches to fallback model automatically
+- Logs fallback decision
+- Can trigger session recovery
+
+**Configuration:**
+```json
+{
+  "runtime_fallback": {
+    "enabled": true,
+    "retry_count": 3,
+    "fallback_delay_ms": 5000
+  }
+}
+```
+
+## Session Lifecycle
+
+### session-recovery
+
+Auto-recovers from crashed sessions.
+
+**When it executes:** `session.error`
+
+**What it does:**
+- Detects recoverable errors (timeouts, network issues)
+- Retries with exponential backoff
+- Persists recovery attempts
+- Notifies continuation hooks
+
+**Configuration:**
+```json
+{
+  "experimental": {
+    "session_recovery": {
+      "enabled": true,
+      "max_retries": 3
+    }
+  }
+}
+```
+
+### session-notification
+
+OS notifications on session completion.
+
+**When it executes:** `session.idle`
+
+**What it does:**
+- Detects session completion
+- Sends OS notification (macOS/Linux/Windows)
+- Plays sound (optional)
+- Shows toast in terminal
+
+**Configuration:**
+```json
+{
+  "notification": {
+    "enabled": true,
+    "sound": true,
+    "force_enable": false  // Override external notification plugins
+  }
+}
+```
+
+### auto-update-checker
+
+Checks for plugin updates on session start.
+
+**When it executes:** `session.created`
+
+**What it does:**
+- Checks npm for latest version
+- Shows toast if update available
+- Logs current vs latest version
+- Respects check frequency (24h default)
+
+**Configuration:**
+```json
+{
+  "auto_update": {
+    "enabled": true,
+    "check_frequency_hours": 24
+  }
+}
+```
+
+## Agent-Specific Hooks
+
+### ralph-loop
+
+Self-referential dev loop via `/ralph-loop` command.
+
+**When it executes:** `event` (session.idle)
+
+**What it does:**
+- Iterates development loop until done
+- Detects `<promise>DONE</promise>` in output
+- Injects continuation prompts
+- Persists state to `.sisyphus/ralph-loop.local.md`
+- Max 100 iterations (configurable)
+
+**Configuration:**
+```json
+{
+  "ralph_loop": {
+    "max_iterations": 100,
+    "completion_promise": "<promise>DONE</promise>"
+  }
+}
+```
+
+### no-sisyphus-gpt
+
+Blocks Sisyphus agent from using GPT models.
+
+**When it executes:** `chat.message`
+
+**What it does:**
+- Detects Sisyphus agent + GPT model combo
+- Shows warning toast
+- Suggests using Claude instead
+- Prevents execution
+
+### no-hephaestus-non-gpt
+
+Blocks Hephaestus agent from using non-GPT models.
+
+**When it executes:** `chat.message`
+
+**What it does:**
+- Detects Hephaestus agent + non-GPT model
+- Shows warning toast
+- Suggests using GPT models
+- Allows override via config
+
+**Configuration:**
+```json
+{
+  "agents": {
+    "hephaestus": {
+      "allow_non_gpt_model": true
+    }
+  }
+}
+```
+
+### agent-usage-reminder
+
+Reminds user about available agents.
+
+**When it executes:** `chat.message`
+
+**What it does:**
+- Tracks agent usage frequency
+- Shows reminders for underused agents
+- Suggests agent for current task
+- Respects cooldown period
+
+## Tool Integration Hooks
+
+### interactive-bash-session
+
+Manages tmux sessions for interactive tools.
+
+**When it executes:** `tool.execute` (for `interactive_bash`)
+
+**What it does:**
+- Creates tmux session per agent session
+- Persists shell state across tool calls
+- Cleans up tmux sessions on session end
+- Handles tmux process lifecycle
+
+**Configuration:**
+```json
+{
+  "tmux": {
+    "enabled": true,
+    "session_prefix": "opencode-"
+  }
+}
+```
+
+### edit-error-recovery
+
+Retries failed file edits.
+
+**When it executes:** `tool.execute.after` (Edit tool)
+
+**What it does:**
+- Detects edit failures (file locked, permissions, etc.)
+- Retries with exponential backoff
+- Injects error explanation
+- Suggests fixes
+
+### delegate-task-retry
+
+Retries failed task delegations.
+
+**When it executes:** `tool.execute.after` (task tool)
+
+**What it does:**
+- Detects delegation failures
+- Retries with different model if available
+- Logs retry attempts
+- Max 3 retries
+
+### delegate-task-english-directive
+
+Ensures task descriptions are in English.
+
+**When it executes:** `tool.execute.before` (task tool)
+
+**What it does:**
+- Detects non-English task descriptions
+- Translates to English automatically
+- Preserves original in metadata
+
+## Environment Hooks
+
+### non-interactive-env
+
+Adjusts behavior for `run` command (non-TTY).
+
+**When it executes:** `chat.message`
+
+**What it does:**
+- Detects non-interactive environment
+- Disables fancy UI features
+- Adjusts continuation prompts
+- Simplifies output formatting
+
+## Work Session Management
+
+### start-work
+
+Handles `/start-work` command for Sisyphus.
+
+**When it executes:** `chat.message`
+
+**What it does:**
+- Starts boulder work session
+- Loads task from `.sisyphus/current.md`
+- Sets up continuation enforcement
+- Optionally auto-commits on completion
+
+**Configuration:**
+```json
+{
+  "start_work": {
+    "auto_commit": true,
+    "commit_message_template": "feat: {task_summary}"
+  }
+}
+```
+
+### prometheus-md-only
+
+Enforces .md-only writes for Prometheus agent.
+
+**When it executes:** `tool.execute.before` (Write tool)
+
+**What it does:**
+- Detects Prometheus agent
+- Blocks non-.md file writes
+- Shows error message
+- Allows exceptions for specific paths
+
+### sisyphus-junior-notepad
+
+Injects notepad for Sisyphus Junior subagent.
+
+**When it executes:** `chat.message`
+
+**What it does:**
+- Detects Sisyphus Junior agent
+- Injects notepad prompt
+- Enables note-taking during execution
+- Persists notes to session storage
+
+## UI Hooks
+
+### question-label-truncator
+
+Truncates long question labels in UI.
+
+**When it executes:** `tool.execute.before`
+
+**What it does:**
+- Detects long question/description fields
+- Truncates to 100 chars max
+- Adds "..." suffix
+- Preserves full text in metadata
+
+### task-resume-info
+
+Injects task context when resuming cancelled tasks.
+
+**When it executes:** `chat.message`
+
+**What it does:**
+- Detects resumed task sessions
+- Injects previous task progress
+- Shows what was completed
+- Highlights remaining work
+
+## Disabling Session Hooks
+
+Disable specific hooks:
+
+```json
+{
+  "disabled_hooks": [
+    "auto-update-checker",
+    "session-notification",
+    "agent-usage-reminder"
+  ]
+}
+```
+
+## Related Documentation
+
+- [Hooks Overview](/api/hooks/overview)
+- [Tool Guard Hooks](/api/hooks/tool-guard-hooks)
+- [Continuation Hooks](/api/hooks/continuation-hooks)
+- [Transform Hooks](/api/hooks/transform-hooks)

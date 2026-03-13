@@ -1,0 +1,326 @@
+---
+title: Transform Hooks
+description: Hooks for transforming messages and injecting context
+---
+
+## Overview
+
+Transform hooks (4 total) modify message arrays before they're sent to the LLM. These hooks execute on `experimental.chat.messages.transform` events and can inject context, validate structure, or modify message content.
+
+## Available Hooks
+
+### claude-code-hooks
+
+Provides Claude Code `settings.json` compatibility layer.
+
+**When it executes:** `messages.transform`
+
+**What it does:**
+- Reads `settings.json` from workspace
+- Maps Claude Code settings to Oh My OpenAgent config
+- Injects custom instructions into system prompt
+- Handles model overrides, prompt caching, and custom rules
+
+**Supported Settings:**
+```json
+{
+  "opencode.customInstructions": "Always use TypeScript strict mode",
+  "opencode.modelOverride": "claude-opus-4.6",
+  "opencode.experimentalPromptCaching": true,
+  "opencode.customRules": [
+    "No console.log in production",
+    "Always add JSDoc comments"
+  ]
+}
+```
+
+**Mapping:**
+- `customInstructions` → Injected into system prompt
+- `modelOverride` → Changes active model
+- `customRules` → Injected as conditional rules
+- `experimentalPromptCaching` → Enables prompt caching
+
+**Configuration:**
+```json
+{
+  "claude_code_hooks": {
+    "enabled": true,
+    "settings_path": ".vscode/settings.json"
+  }
+}
+```
+
+### keyword-detector
+
+Detects special keywords and enables modes (ultrawork, search, analyze).
+
+**When it executes:** `messages.transform`
+
+**What it does:**
+- Scans user messages for mode keywords
+- Activates mode-specific system prompts
+- Adjusts model parameters
+- Enables mode-specific tools
+
+**Detected Keywords:**
+
+**Ultrawork Mode:**
+- Keywords: `ultrawork`, `ultra work`, `maximum effort`
+- Effect: Max reasoning effort, extended context, all tools enabled
+- System prompt: "You are in ULTRAWORK mode. Use maximum reasoning effort and all available tools."
+
+**Search Mode:**
+- Keywords: `search`, `find`, `locate`, `grep for`
+- Effect: Prioritize search tools (grep, glob, ast_grep)
+- System prompt: "Focus on searching and finding information efficiently."
+
+**Analyze Mode:**
+- Keywords: `analyze`, `investigation`, `deep dive`, `examine`
+- Effect: Enable analysis tools (LSP, ast_grep, session_search)
+- System prompt: "Perform deep analysis using all available code intelligence tools."
+
+**Prove Yourself Mode:**
+- Keywords: `prove yourself`, `show me what you can do`
+- Effect: Maximum autonomy, background tasks encouraged
+- System prompt: "Demonstrate your full capabilities. Use all tools and agents as needed."
+
+**Configuration:**
+```json
+{
+  "keyword_detector": {
+    "enabled": true,
+    "custom_keywords": {
+      "ultrawork": ["max effort", "give it everything"],
+      "search": ["hunt for", "track down"]
+    }
+  }
+}
+```
+
+**Mode Injection Example:**
+```typescript
+// User message
+"I need to search for all TODO comments in the codebase"
+
+// Detected: search mode
+// Injected system prompt:
+"Focus on searching and finding information efficiently.
+Prioritized tools: grep, glob, ast_grep_search"
+```
+
+### thinking-block-validator
+
+Validates thinking block structure and content.
+
+**When it executes:** `messages.transform`
+
+**What it does:**
+- Detects `<thinking>` blocks in assistant messages
+- Validates structure (opening/closing tags)
+- Checks content for common issues
+- Warns about malformed blocks
+- Optionally strips invalid blocks
+
+**Validation Rules:**
+1. Must have matching `<thinking>` and `</thinking>` tags
+2. Cannot nest thinking blocks
+3. Must contain actual content (not empty)
+4. Cannot contain other XML tags inside
+
+**Example Valid Thinking Block:**
+```xml
+<thinking>
+I need to analyze the authentication flow:
+1. User submits credentials
+2. Server validates against database
+3. JWT token is generated
+4. Token stored in session
+
+Potential issue: Token expiration not checked.
+</thinking>
+```
+
+**Example Invalid:**
+```xml
+<thinking>
+<substep>This is invalid</substep>
+</thinking>
+
+<thinking>
+Nested is not allowed:
+<thinking>Invalid</thinking>
+</thinking>
+```
+
+**Configuration:**
+```json
+{
+  "thinking_block_validator": {
+    "enabled": true,
+    "strip_invalid": true,  // Remove invalid blocks
+    "warn_on_invalid": true
+  }
+}
+```
+
+### context-injector (messages transform)
+
+Injects AGENTS.md and README.md into context.
+
+**When it executes:** `messages.transform`
+
+**What it does:**
+- Loads AGENTS.md from directory tree
+- Loads README.md from project root
+- Injects as system messages
+- Respects token budget
+- Caches injected content
+
+**Injection Priority:**
+1. Current directory AGENTS.md (highest)
+2. Parent directory AGENTS.md
+3. Project root AGENTS.md
+4. Project README.md (lowest)
+
+**Token Budget:**
+- AGENTS.md: Up to 10,000 tokens per file
+- README.md: Up to 5,000 tokens
+- Total context injection: Max 20,000 tokens
+
+**Example Injected Content:**
+```xml
+<system_context source="AGENTS.md">
+# src/api/ - API Layer
+
+**Overview**: RESTful API implementation
+
+**Conventions**:
+- All endpoints return JSON
+- Use 401 for auth errors
+- Validate input with Zod
+
+**Key Files**:
+- routes.ts: Route definitions
+- middleware.ts: Auth & validation
+</system_context>
+
+<system_context source="README.md">
+# MyProject
+
+A web application for user management.
+
+## Architecture
+- Frontend: React + TypeScript
+- Backend: Node.js + Express
+- Database: PostgreSQL
+</system_context>
+```
+
+**Configuration:**
+```json
+{
+  "context_injector": {
+    "enabled": true,
+    "max_tokens_per_file": 10000,
+    "sources": ["agents.md", "readme.md"],
+    "cache_duration_ms": 60000  // 1 minute
+  }
+}
+```
+
+## Transform Order
+
+Hooks execute in this order:
+
+1. **context-injector** - Inject AGENTS.md/README first
+2. **claude-code-hooks** - Apply settings.json overrides
+3. **keyword-detector** - Detect modes and inject prompts
+4. **thinking-block-validator** - Validate thinking blocks last
+
+## Message Structure
+
+Transform hooks receive message arrays:
+
+```typescript
+type Message = {
+  role: "system" | "user" | "assistant"
+  content: string | ContentBlock[]
+}
+
+type ContentBlock = {
+  type: "text" | "image" | "tool_use" | "tool_result"
+  // ... type-specific fields
+}
+```
+
+Hooks can:
+- Add new messages (inject system prompts)
+- Modify existing messages (edit content)
+- Remove messages (strip invalid blocks)
+- Reorder messages (change sequence)
+
+## Best Practices
+
+### Context Injection
+
+✅ **Do:**
+- Inject early in message array (system context first)
+- Cache injected content (avoid re-reading files)
+- Respect token budgets (truncate if needed)
+
+❌ **Don't:**
+- Inject same content multiple times
+- Exceed context window limits
+- Inject on every message (use caching)
+
+### Mode Detection
+
+✅ **Do:**
+- Use clear, unambiguous keywords
+- Document mode behaviors
+- Allow mode override via config
+
+❌ **Don't:**
+- Detect modes based on vague patterns
+- Activate multiple conflicting modes
+- Change behavior without user awareness
+
+### Validation
+
+✅ **Do:**
+- Validate structure before content
+- Provide clear error messages
+- Offer auto-fix when possible
+
+❌ **Don't:**
+- Silently strip content
+- Block execution on minor issues
+- Over-validate (trust the model)
+
+## Disabling Transform Hooks
+
+Disable specific hooks:
+
+```json
+{
+  "disabled_hooks": [
+    "keyword-detector",
+    "thinking-block-validator"
+  ]
+}
+```
+
+Disable all transform hooks:
+
+```json
+{
+  "disabled_hooks": ["transform-*"]
+}
+```
+
+## Related Documentation
+
+- [Hooks Overview](/api/hooks/overview)
+- [Session Hooks](/api/hooks/session-hooks)
+- [Tool Guard Hooks](/api/hooks/tool-guard-hooks)
+- [Continuation Hooks](/api/hooks/continuation-hooks)

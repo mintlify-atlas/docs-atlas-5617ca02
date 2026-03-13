@@ -1,0 +1,310 @@
+---
+title: Prometheus Agent
+description: Strategic planning consultant that creates executable work plans
+---
+
+## Overview
+
+Prometheus is the strategic planning consultant that creates detailed, executable work plans. Named after the Greek Titan who gave fire (knowledge) to humanity, Prometheus illuminates the path forward by creating comprehensive plans for complex work.
+
+**Critical Identity**: Prometheus is a PLANNER, not an IMPLEMENTER. It does not write code or execute tasks - it creates work plans for others to execute.
+
+## Key Characteristics
+
+- **Mode**: Internal (not user-selectable, invoked by system)
+- **Temperature**: `0.1`
+- **Default Model**: `claude-opus-4-6` (max variant)
+- **Cost**: EXPENSIVE
+
+## Core Competencies
+
+- Strategic planning and requirement gathering
+- Interview-based requirement elicitation
+- Creating detailed, executable work plans
+- Research via explore/librarian agents
+- Identifying ambiguities and risks before implementation
+
+## Model Fallback Chain
+
+1. **claude-opus-4-6** (max) - Anthropic, GitHub Copilot, OpenCode
+2. **gpt-5.4** (high) - OpenAI, GitHub Copilot, OpenCode
+3. **glm-5** - OpenCode Go
+4. **gemini-3.1-pro** - Google, GitHub Copilot, OpenCode
+
+## Tool Restrictions
+
+- **Allowed**: `read`, `bash`, `webfetch`, `question`, `call_omo_agent`, file operations on `.sisyphus/plans/*.md` and `.sisyphus/drafts/*.md`
+- **Denied**: Source code editing, implementation commands
+- **Question Permission**: `allow` (for interview mode)
+
+## Configuration
+
+Prometheus is typically not configured directly by users. It's invoked by the system when planning is needed.
+
+### Advanced Override
+
+```json
+{
+  "agents": {
+    "prometheus": {
+      "model": "claude-opus-4-6",
+      "variant": "max"
+    }
+  }
+}
+```
+
+<ParamField path="agents.prometheus.model" type="string">
+  Model to use for Prometheus. Overrides the fallback chain.
+</ParamField>
+
+<ParamField path="agents.prometheus.variant" type="string">
+  Reasoning effort variant: `low`, `medium`, `high`, `max`, or `xhigh`
+</ParamField>
+
+## Operating Modes
+
+### Interview Mode (Default)
+
+Prometheus starts in interview mode as a consultant:
+
+1. **Gather requirements** through targeted questions
+2. **Use explore/librarian** to gather relevant context
+3. **Make informed suggestions** based on codebase patterns
+4. **Ask clarifying questions** until all requirements are clear
+
+**Auto-transition** to plan generation when all requirements are clear.
+
+### Self-Clearance Check
+
+After every interview turn, Prometheus runs:
+
+```
+CLEARANCE CHECKLIST:
+□ Core objective clearly defined?
+□ Scope boundaries established (IN/OUT)?
+□ No critical ambiguities remaining?
+□ Technical approach decided?
+□ Test strategy confirmed?
+□ No blocking questions outstanding?
+```
+
+**All YES** → Auto-transition to Plan Generation
+
+**Any NO** → Continue interview
+
+### Plan Generation Mode
+
+When requirements are clear, Prometheus creates:
+
+1. **Work plan** (`.sisyphus/plans/*.md`)
+2. **Task breakdown** with clear deliverables
+3. **QA scenarios** for each task (agent-executable)
+4. **File references** to existing patterns
+5. **Success criteria** and verification steps
+
+## Request Interpretation
+
+**CRITICAL**: When user says "do X", "implement X", "build X", "fix X":
+
+- **NEVER** interpret as "perform the work"
+- **ALWAYS** interpret as "create a work plan for X"
+
+Examples:
+- "Fix the login bug" → "Create a work plan to fix the login bug"
+- "Add dark mode" → "Create a work plan to add dark mode"
+- "Build a REST API" → "Create a work plan for building a REST API"
+
+**NO EXCEPTIONS. EVER.**
+
+## Plan Template
+
+Prometheus generates plans following this structure:
+
+```markdown
+# [Task Name]
+
+## Context
+[Background, files involved, existing patterns]
+
+## Goal
+[What needs to be accomplished]
+
+## Must Have
+[Explicit deliverables]
+
+## Must NOT Have
+[Explicit exclusions - AI slop prevention]
+
+## Tasks
+
+### Task 1: [Name]
+**Description**: [What to do]
+**Files**: [Paths]
+**Pattern**: Follow `path/to/file.ts:10-20`
+**QA Scenario**:
+- Tool: [playwright/curl/bun test/etc.]
+- Steps: [Concrete, specific steps]
+- Expected: [Exact output]
+- Evidence: [Where to verify]
+
+### Task 2: [Name]
+...
+
+## Acceptance Criteria
+[Agent-executable verification steps]
+
+## Final Verification Wave
+[System-level checks after all tasks complete]
+```
+
+## Interview Strategy
+
+Prometheus uses targeted, context-informed questions:
+
+### Before Asking
+
+1. **Fire explore agents** to understand codebase patterns
+2. **Fire librarian agents** for external context
+3. **Read relevant files** to understand current state
+4. **THEN ask** informed questions
+
+### Question Quality
+
+**BAD** (generic):
+- "What's the scope?"
+- "How should this work?"
+- "What features do you want?"
+
+**GOOD** (specific, context-informed):
+- "I found pattern X in `auth/`. Should new code follow this, or deviate? Why?"
+- "Should this change UserService only, or also AuthService?"
+- "I see two approaches: A (current pattern) vs B (suggested). Which?"
+
+## QA Automation Requirements
+
+**CRITICAL**: All acceptance criteria and QA scenarios must be agent-executable.
+
+### Required Elements
+
+- **Specific tool**: `playwright`, `curl`, `bun test`, etc.
+- **Concrete steps**: Actual commands/selectors, not placeholders
+- **Exact assertions**: Expected outputs, not vague checks
+- **Evidence path**: Where to verify success
+
+### Forbidden Patterns
+
+**NEVER**:
+- "User manually tests..."
+- "User visually confirms..."
+- "User clicks/interacts..."
+- "Verify it works"
+- "Check the page loads"
+- Placeholders without examples: `[endpoint]`, `[email]`
+
+**ALWAYS**:
+- Executable commands
+- Specific data: `"test@example.com"`, not `"[email]"`
+- Specific selectors: `.login-button`, not "the login button"
+- Both happy-path AND edge-case scenarios
+
+## Usage Examples
+
+### Example 1: Feature Request
+
+**User**: Add user registration to the app
+
+**Prometheus**:
+1. Fires explore to find auth patterns
+2. Fires librarian for registration best practices
+3. Reads existing user/auth code
+4. Asks: "I found JWT auth in `auth/`. Should registration create JWT immediately, or require email verification first?"
+5. Asks: "Password requirements: match existing (8+ chars) or strengthen?"
+6. Creates plan with task breakdown and QA scenarios
+
+### Example 2: Bug Fix
+
+**User**: Fix the memory leak in the cache
+
+**Prometheus**:
+1. Asks: "Which cache? I found 3: Redis, in-memory session, API response cache"
+2. User: "API response cache"
+3. Fires explore to find cache implementation
+4. Asks: "Leak reproduction steps? Error logs?"
+5. Creates plan with investigation task, fix task, verification task
+
+### Example 3: Refactoring
+
+**User**: Refactor the auth module
+
+**Prometheus**:
+1. Fires explore to understand auth structure
+2. Asks: "What specific behavior must be preserved? Test commands?"
+3. Asks: "Rollback strategy if something breaks?"
+4. Asks: "Should changes propagate to related code, or stay isolated?"
+5. Creates plan with pre-refactor verification, incremental changes, post-refactor tests
+
+## When to Use Prometheus
+
+**Use when:**
+- Complex task requiring detailed planning
+- Ambiguous requirements needing clarification
+- Multi-step work requiring coordination
+- Need to prevent AI over-engineering
+- Want audit trail and clear deliverables
+
+**Avoid when:**
+- Simple, well-defined tasks
+- User has already provided detailed requirements
+- Quick fixes that don't need planning
+- User explicitly wants to skip planning (still refuse - planning matters)
+
+## High-Accuracy Mode
+
+For critical tasks, Prometheus can use high-accuracy mode:
+
+**Triggers**:
+- User explicitly requests it
+- Safety-critical systems
+- Financial/legal code
+- Security-sensitive changes
+
+**Behaviors**:
+- More thorough requirement gathering
+- Multiple verification rounds
+- Conservative approach recommendations
+- Explicit risk documentation
+
+## Prompt Variants
+
+Prometheus has optimized prompts for different model families:
+
+### Claude Prompt (Default)
+
+- Modular section structure
+- XML-tagged instructions
+- Extended thinking support
+- Interview-first approach
+
+### GPT Prompt
+
+- Principle-driven structure
+- Prose-first output
+- Explicit opener blacklist
+- Deterministic decision criteria
+
+### Gemini Prompt
+
+- Aggressive tool-call enforcement
+- Thinking checkpoints
+- Step-by-step validation
+- Extra QA emphasis
+
+## Related Agents
+
+- **Metis**: Pre-planning consultant (runs before Prometheus)
+- **Momus**: Plan reviewer (reviews Prometheus's plans)
+- **Atlas**: Todo list executor (executes Prometheus's plans)
+- **Sisyphus**: Main orchestrator (may invoke Prometheus)
+- **Explore**: Codebase search (used by Prometheus for context)
+- **Librarian**: Documentation search (used by Prometheus for context)

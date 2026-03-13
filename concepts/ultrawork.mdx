@@ -1,0 +1,604 @@
+---
+title: Ultrawork Mode
+description: The "just do it" mode for lazy execution - one word activates everything
+---
+
+## What Is Ultrawork?
+
+Ultrawork (or `ulw`) is the "just do it" mode. One word. Every agent activates. Doesn't stop until done.
+
+It's the lazy mode. You don't have to think deep because the agent thinks deep for you.
+
+<Note>
+Type `ultrawork` or `ulw` and the agent figures everything out - explores your codebase, researches patterns, implements the feature, verifies with diagnostics.
+</Note>
+
+## How It Works
+
+### Keyword Detection
+
+The system detects these keywords in your message:
+- `ultrawork`
+- `ulw`
+
+When detected (case-insensitive, word boundaries):
+
+```typescript
+const ULTRAWORK_PATTERN = /\b(ultrawork|ulw)\b/i
+
+if (ULTRAWORK_PATTERN.test(userMessage)) {
+  // Activate ultrawork mode
+  applyModelOverride()
+  setUltraworkContext()
+}
+```
+
+### Model Override
+
+Ultrawork can override the current model based on your agent config:
+
+```jsonc oh-my-opencode.jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-sonnet-4-6",  // Default model
+      "ultrawork": {
+        "model": "anthropic/claude-opus-4-6",  // Ultrawork model
+        "variant": "max"                        // Max reasoning effort
+      }
+    }
+  }
+}
+```
+
+**What happens:**
+1. You type "ultrawork fix the tests"
+2. System detects keyword
+3. Switches from Sonnet → Opus (max variant)
+4. Agent gets more powerful model for complex work
+
+<Tabs>
+<Tab title="Default Mode">
+```
+User: "Fix the failing tests"
+
+Agent: Claude Sonnet 4.6
+Behavior: Standard orchestration
+Reasoning: Normal
+```
+</Tab>
+
+<Tab title="Ultrawork Mode">
+```
+User: "ultrawork fix the failing tests"
+
+Agent: Claude Opus 4.6 (max variant)
+Behavior: Aggressive autonomous execution
+Reasoning: Maximum effort
+```
+</Tab>
+</Tabs>
+
+### Autonomous Execution
+
+In ultrawork mode, agents become more autonomous:
+
+**Standard behavior:**
+- Ask clarifying questions
+- Wait for confirmation
+- Step-by-step execution
+- Frequent status updates
+
+**Ultrawork behavior:**
+- Minimal questions (only critical ambiguities)
+- Explores thoroughly before asking
+- End-to-end execution
+- Focus on results, not play-by-play
+
+### Context Injection
+
+Ultrawork mode injects special instructions:
+
+```markdown
+<ultrawork_mode>
+You are in ULTRAWORK mode - autonomous, goal-driven execution.
+
+- Explore extensively before acting
+- Fire background agents for research (explore, librarian)
+- Implement end-to-end without premature stopping
+- Verify completion with diagnostics
+- Minimal status updates, maximum results
+
+- Plan well for ultrawork execution.
+</ultrawork_mode>
+```
+
+## When to Use Ultrawork
+
+### Perfect For
+
+<CardGroup cols={2}>
+<Card title="Complex Tasks" icon="brain">
+**Example:**
+```
+ulw refactor the authentication system
+```
+
+Agent explores patterns, researches best practices, implements changes, verifies with tests.
+</Card>
+
+<Card title="Tedious Context" icon="clock">
+**Example:**
+```
+ulw fix all the type errors
+```
+
+Agent finds all errors, understands context, fixes systematically, verifies build passes.
+</Card>
+
+<Card title="Multi-Step Work" icon="list-check">
+**Example:**
+```
+ulw add JWT authentication to the API
+```
+
+Agent explores existing auth, researches JWT patterns, implements, tests, documents.
+</Card>
+
+<Card title="Exploration Needed" icon="magnifying-glass">
+**Example:**
+```
+ulw optimize the database queries
+```
+
+Agent explores queries, identifies bottlenecks, researches optimization techniques, implements improvements.
+</Card>
+</CardGroup>
+
+### Not Ideal For
+
+<Warning>
+**Simple tasks:**
+```
+# Don't use ultrawork for trivial work
+ulw fix the typo in README  ❌
+
+# Just prompt normally
+Fix the typo in README      ✅
+```
+</Warning>
+
+<Warning>
+**Need control:**
+```
+# Don't use ultrawork when you want step-by-step
+ulw refactor the entire codebase  ❌
+
+# Use Prometheus planning instead
+@plan "refactor the entire codebase"  ✅
+```
+</Warning>
+
+## Examples
+
+### Example 1: Fix Failing Tests
+
+```
+ulw fix the failing tests
+```
+
+**What happens:**
+
+1. **Exploration** (background agents in parallel):
+   ```typescript
+   task(subagent_type="explore", run_in_background=true,
+     prompt="Find all test files and recent changes")
+   ```
+
+2. **Analysis**:
+   - Runs the tests
+   - Identifies failure patterns
+   - Traces root causes
+
+3. **Implementation**:
+   - Fixes each failing test
+   - Verifies fixes don't break other tests
+   - Runs full test suite
+
+4. **Verification**:
+   ```bash
+   npm test  # All tests pass
+   ```
+
+### Example 2: Add New Feature
+
+```
+ulw add input validation to the API
+```
+
+**What happens:**
+
+1. **Research** (parallel background agents):
+   ```typescript
+   task(subagent_type="explore", run_in_background=true,
+     prompt="Find existing validation patterns")
+   
+   task(subagent_type="librarian", run_in_background=true,
+     prompt="Research FastAPI validation best practices")
+   ```
+
+2. **Planning**:
+   - Identifies API endpoints
+   - Determines validation requirements
+   - Chooses validation library
+
+3. **Implementation** (parallel if endpoints are independent):
+   ```typescript
+   task(category="unspecified-high", run_in_background=true,
+     prompt="Add validation to /users endpoints")
+   
+   task(category="unspecified-high", run_in_background=true,
+     prompt="Add validation to /posts endpoints")
+   ```
+
+4. **Testing**:
+   - Creates test cases
+   - Verifies validation works
+   - Checks error messages
+
+5. **Documentation**:
+   ```typescript
+   task(category="writing", run_in_background=true,
+     prompt="Document the validation schema")
+   ```
+
+### Example 3: Refactor Complex System
+
+```
+ulw refactor the auth system to use OAuth2
+```
+
+**What happens:**
+
+1. **Deep Exploration**:
+   ```typescript
+   task(subagent_type="explore", run_in_background=true,
+     prompt="Find all authentication code and dependencies")
+   ```
+
+2. **Research**:
+   ```typescript
+   task(subagent_type="librarian", run_in_background=true,
+     prompt="Find OAuth2 implementation guides and security best practices")
+   ```
+
+3. **Architectural Review**:
+   ```typescript
+   task(subagent_type="oracle", run_in_background=false,
+     prompt="Review OAuth2 implementation plan. Identify security risks.")
+   ```
+
+4. **Implementation** (sequential because of dependencies):
+   - Install OAuth2 library
+   - Create OAuth2 provider config
+   - Implement authorization flow
+   - Update authentication middleware
+   - Migrate existing sessions
+
+5. **Testing**:
+   - Test OAuth2 flow
+   - Verify security headers
+   - Check session management
+
+6. **Verification**:
+   ```bash
+   npm run build  # No errors
+   npm test       # All tests pass
+   ```
+
+## Ultrawork vs Hephaestus
+
+Both are autonomous execution modes. When to use which?
+
+| Aspect | Ultrawork | Hephaestus |
+|--------|-----------|------------|
+| **Activation** | Keyword in Sisyphus | Switch to Hephaestus agent |
+| **Model** | Configurable (usually Opus/Sonnet) | GPT-5.3 Codex |
+| **Approach** | Sisyphus with ultrawork context | Dedicated autonomous agent |
+| **Best For** | General complex tasks | Deep architectural work |
+| **Planning** | Uses Prometheus plans if available | Self-plans during execution |
+| **Reasoning** | High effort (max variant) | Medium effort (GPT Codex) |
+
+### When to Use Ultrawork
+
+```
+✅ General complex tasks
+✅ You're already in Sisyphus
+✅ Want Claude Opus reasoning
+✅ Task fits existing patterns
+```
+
+**Example:**
+```
+ulw implement JWT authentication following our patterns
+```
+
+### When to Use Hephaestus
+
+```
+✅ Deep architectural reasoning
+✅ Complex debugging across many files
+✅ Cross-domain knowledge synthesis
+✅ Specifically want GPT-5.3 Codex style
+```
+
+**Example:**
+```
+// Switch to Hephaestus
+Press Tab → Select "Hephaestus"
+
+"Design a new plugin system with hot-reloading"
+```
+
+<Tip>
+For most users: Use `ulw` in Sisyphus. It works excellently for 90% of complex tasks.
+
+For power users: Switch to Hephaestus when you need GPT-5.3 Codex's specific reasoning style.
+</Tip>
+
+## Configuration
+
+### Agent-Level Ultrawork
+
+Configure ultrawork for each agent:
+
+```jsonc oh-my-opencode.jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "variant": "high",
+      "ultrawork": {
+        "model": "anthropic/claude-opus-4-6",
+        "variant": "max"
+      }
+    },
+    
+    "hephaestus": {
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium",
+      "ultrawork": {
+        "model": "openai/gpt-5.4",
+        "variant": "xhigh"
+      }
+    }
+  }
+}
+```
+
+### Variant-Only Override
+
+You can override just the variant:
+
+```jsonc oh-my-opencode.jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "high",
+      "ultrawork": {
+        "variant": "max"  // Same model, higher effort
+      }
+    }
+  }
+}
+```
+
+### Model-Only Override
+
+Or just the model:
+
+```jsonc oh-my-opencode.jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "ultrawork": {
+        "model": "anthropic/claude-opus-4-6"  // Keep default variant
+      }
+    }
+  }
+}
+```
+
+## Ralph Loop Integration
+
+Ultrawork works with Ralph Loop for continuous execution:
+
+```bash
+/ulw-loop "refactor the authentication system"
+```
+
+**What happens:**
+
+1. Activates ultrawork mode
+2. Activates Ralph Loop (self-referential execution)
+3. Agent works until 100% done
+4. Oracle verification at the end
+5. Loop continues if verification fails
+
+<Warning>
+Ralph Loop is aggressive. Use for tasks with clear completion criteria.
+</Warning>
+
+## Best Practices
+
+<AccordionGroup>
+<Accordion title="Be Specific About the Goal">
+```
+# Bad (too vague)
+ulw improve the code
+
+# Good (clear goal)
+ulw refactor the API handlers to reduce duplication
+```
+</Accordion>
+
+<Accordion title="Trust the Agent's Exploration">
+```
+# Don't over-explain
+ulw add authentication. The user model is in src/models/user.ts 
+and we use bcrypt for passwords and JWT tokens are in the auth 
+service and...
+
+# Let the agent explore
+ulw add JWT authentication to the API
+```
+</Accordion>
+
+<Accordion title="Use for Complex Work">
+```
+# Don't waste ultrawork on simple tasks
+ulw fix typo in README  ❌
+
+# Use for genuinely complex work
+ulw migrate from REST to GraphQL  ✅
+```
+</Accordion>
+
+<Accordion title="Combine With Skills">
+If you know which skills are relevant, mention them:
+
+```
+ulw add playwright tests for the checkout flow
+# System knows to load playwright skill
+
+ulw implement the homepage redesign
+# System knows to load frontend-ui-ux skill
+```
+</Accordion>
+</AccordionGroup>
+
+## How It's Implemented
+
+### Detection Phase
+
+```typescript
+// src/plugin/ultrawork-model-override.ts
+
+const ULTRAWORK_PATTERN = /\b(ultrawork|ulw)\b/i
+
+export function detectUltrawork(message: string): boolean {
+  return ULTRAWORK_PATTERN.test(message)
+}
+```
+
+### Override Resolution
+
+```typescript
+export function resolveUltraworkOverride(
+  message: string,
+  agentName: string,
+  config: Config
+) {
+  if (!detectUltrawork(message)) return null
+  
+  const ultraworkConfig = config.agents?.[agentName]?.ultrawork
+  if (!ultraworkConfig?.model && !ultraworkConfig?.variant) {
+    return null
+  }
+  
+  return {
+    modelID: ultraworkConfig.model,
+    variant: ultraworkConfig.variant
+  }
+}
+```
+
+### Model Switch
+
+```typescript
+export function applyUltraworkModelOverride(
+  message: ChatMessage,
+  currentModel: string,
+  agentName: string
+) {
+  const override = resolveUltraworkOverride(message.text, agentName)
+  
+  if (!override) return message
+  if (override.modelID === currentModel) return message
+  
+  // Schedule deferred DB override
+  scheduleDeferredModelOverride({
+    messageId: message.id,
+    targetModel: override
+  })
+  
+  return message
+}
+```
+
+<Info>
+Model switching happens via deferred database update to avoid race conditions with the OpenCode SDK.
+</Info>
+
+## Troubleshooting
+
+### "Ultrawork keyword detected but model didn't change"
+
+Check your config:
+```jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "ultrawork": {
+        "model": "anthropic/claude-opus-4-6"  // Is this configured?
+      }
+    }
+  }
+}
+```
+
+### "Agent still asks too many questions in ultrawork mode"
+
+Ultrawork reduces questions but doesn't eliminate them. For critical ambiguities, the agent will still ask.
+
+If you want zero questions, use Prometheus planning:
+```bash
+@plan "your task"
+# Answer all questions
+/start-work
+```
+
+### "Ultrawork takes too long"
+
+Ultrawork explores thoroughly before acting. This is intentional.
+
+If the task is simple, don't use ultrawork:
+```
+# Don't use ultrawork for quick fixes
+Fix the typo in line 42
+
+# Use ultrawork for complex work
+ulw refactor the database layer
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Orchestration" icon="diagram-project" href="/concepts/orchestration">
+Learn how agents work together
+</Card>
+
+<Card title="Agents" icon="robot" href="/concepts/agents">
+Understand each agent's specialization
+</Card>
+
+<Card title="Ralph Loop" icon="repeat" href="/advanced/ralph-loop">
+Continuous execution until 100% done
+</Card>
+
+<Card title="Configuration" icon="gear" href="/guides/configuration">
+Customize ultrawork behavior
+</Card>
+</CardGroup>

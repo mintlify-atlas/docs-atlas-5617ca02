@@ -1,0 +1,397 @@
+---
+title: "Experimental Features"
+description: "Configure experimental features, performance settings, and feature toggles"
+---
+
+## Overview
+
+The experimental configuration section enables cutting-edge features and performance optimizations that are under active development. These features may change in future versions.
+
+Defined in `src/config/schema/experimental.ts`
+
+## Configuration Fields
+
+<ParamField path="aggressive_truncation" type="boolean" optional>
+  Enable aggressive truncation of tool outputs
+  
+  When enabled, applies more aggressive token limits to tool outputs
+  
+  ```json
+  {
+    "experimental": {
+      "aggressive_truncation": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="auto_resume" type="boolean" optional>
+  Enable automatic session resumption
+  
+  Automatically resumes interrupted sessions
+  
+  ```json
+  {
+    "experimental": {
+      "auto_resume": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="preemptive_compaction" type="boolean" optional>
+  Enable preemptive context compaction
+  
+  Proactively compacts context before hitting limits
+  
+  ```json
+  {
+    "experimental": {
+      "preemptive_compaction": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="truncate_all_tool_outputs" type="boolean" default="false">
+  Truncate all tool outputs, not just whitelisted tools
+  
+  Tool output truncator is enabled by default - disable via `disabled_hooks` if needed
+  
+  ```json
+  {
+    "experimental": {
+      "truncate_all_tool_outputs": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="dynamic_context_pruning" type="object" optional>
+  Dynamic context pruning configuration
+  
+  Automatically removes redundant or superseded context to stay within token limits
+  
+  See [Dynamic Context Pruning](#dynamic-context-pruning) section below for full schema
+  
+  ```json
+  {
+    "experimental": {
+      "dynamic_context_pruning": {
+        "enabled": true,
+        "notification": "minimal"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="task_system" type="boolean" optional>
+  Enable experimental task system for Todowrite disabler hook
+  
+  ```json
+  {
+    "experimental": {
+      "task_system": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="plugin_load_timeout_ms" type="number" optional>
+  Timeout in milliseconds for loadAllPluginComponents during config handler init
+  
+  Default: 10000ms (10 seconds)
+  
+  Minimum: 1000ms (1 second)
+  
+  ```json
+  {
+    "experimental": {
+      "plugin_load_timeout_ms": 15000
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="safe_hook_creation" type="boolean" optional>
+  Wrap hook creation in try/catch to prevent one failing hook from crashing the plugin
+  
+  Default: true at call site
+  
+  ```json
+  {
+    "experimental": {
+      "safe_hook_creation": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="disable_omo_env" type="boolean" optional>
+  Disable auto-injected `<omo-env>` context in prompts
+  
+  Experimental feature to reduce prompt token usage
+  
+  ```json
+  {
+    "experimental": {
+      "disable_omo_env": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="hashline_edit" type="boolean" optional>
+  Enable hashline_edit tool for improved file editing
+  
+  Uses hash-based line anchors for more reliable edits
+  
+  ```json
+  {
+    "experimental": {
+      "hashline_edit": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="model_fallback_title" type="boolean" default="false">
+  Append fallback model info to session title when a runtime fallback occurs
+  
+  ```json
+  {
+    "experimental": {
+      "model_fallback_title": true
+    }
+  }
+  ```
+</ParamField>
+
+## Dynamic Context Pruning
+
+Advanced configuration for automatic context management:
+
+<ParamField path="dynamic_context_pruning.enabled" type="boolean" default="false">
+  Enable dynamic context pruning
+  
+  ```json
+  {
+    "experimental": {
+      "dynamic_context_pruning": {
+        "enabled": true
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="dynamic_context_pruning.notification" type="enum" default="detailed">
+  Notification level for pruning events
+  
+  Values: `off`, `minimal`, `detailed`
+  
+  ```json
+  {
+    "experimental": {
+      "dynamic_context_pruning": {
+        "notification": "minimal"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="dynamic_context_pruning.turn_protection" type="object" optional>
+  Turn protection prevents pruning recent tool outputs
+  
+  ```json
+  {
+    "experimental": {
+      "dynamic_context_pruning": {
+        "turn_protection": {
+          "enabled": true,
+          "turns": 3
+        }
+      }
+    }
+  }
+  ```
+  
+  <ParamField path="turn_protection.enabled" type="boolean" default="true">
+    Enable turn protection
+  </ParamField>
+  
+  <ParamField path="turn_protection.turns" type="number" default="3">
+    Number of recent turns to protect (1-10)
+  </ParamField>
+</ParamField>
+
+<ParamField path="dynamic_context_pruning.protected_tools" type="string[]" optional>
+  Tools that should never be pruned
+  
+  Default: `["task", "todowrite", "todoread", "lsp_rename", "session_read", "session_write", "session_search"]`
+  
+  ```json
+  {
+    "experimental": {
+      "dynamic_context_pruning": {
+        "protected_tools": [
+          "task",
+          "todowrite",
+          "todoread",
+          "bash"
+        ]
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="dynamic_context_pruning.strategies" type="object" optional>
+  Pruning strategies configuration
+  
+  ```json
+  {
+    "experimental": {
+      "dynamic_context_pruning": {
+        "strategies": {
+          "deduplication": {
+            "enabled": true
+          },
+          "supersede_writes": {
+            "enabled": true,
+            "aggressive": false
+          },
+          "purge_errors": {
+            "enabled": true,
+            "turns": 5
+          }
+        }
+      }
+    }
+  }
+  ```
+  
+  <ParamField path="strategies.deduplication" type="object" optional>
+    Remove duplicate tool calls (same tool + same args)
+    
+    <ParamField path="deduplication.enabled" type="boolean" default="true">
+      Enable deduplication strategy
+    </ParamField>
+  </ParamField>
+  
+  <ParamField path="strategies.supersede_writes" type="object" optional>
+    Prune write inputs when file subsequently read
+    
+    <ParamField path="supersede_writes.enabled" type="boolean" default="true">
+      Enable supersede writes strategy
+    </ParamField>
+    
+    <ParamField path="supersede_writes.aggressive" type="boolean" default="false">
+      Aggressive mode: prune any write if ANY subsequent read
+    </ParamField>
+  </ParamField>
+  
+  <ParamField path="strategies.purge_errors" type="object" optional>
+    Prune errored tool inputs after N turns
+    
+    <ParamField path="purge_errors.enabled" type="boolean" default="true">
+      Enable purge errors strategy
+    </ParamField>
+    
+    <ParamField path="purge_errors.turns" type="number" default="5">
+      Number of turns before purging errors (1-20)
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+## Complete Example
+
+```json
+{
+  "experimental": {
+    "aggressive_truncation": false,
+    "auto_resume": true,
+    "preemptive_compaction": true,
+    "truncate_all_tool_outputs": false,
+    "dynamic_context_pruning": {
+      "enabled": true,
+      "notification": "minimal",
+      "turn_protection": {
+        "enabled": true,
+        "turns": 3
+      },
+      "protected_tools": [
+        "task",
+        "todowrite",
+        "todoread",
+        "lsp_rename",
+        "session_read",
+        "session_write",
+        "session_search"
+      ],
+      "strategies": {
+        "deduplication": {
+          "enabled": true
+        },
+        "supersede_writes": {
+          "enabled": true,
+          "aggressive": false
+        },
+        "purge_errors": {
+          "enabled": true,
+          "turns": 5
+        }
+      }
+    },
+    "task_system": false,
+    "plugin_load_timeout_ms": 15000,
+    "safe_hook_creation": true,
+    "disable_omo_env": false,
+    "hashline_edit": false,
+    "model_fallback_title": true
+  }
+}
+```
+
+## TypeScript Types
+
+```typescript
+import type { ExperimentalConfig, DynamicContextPruningConfig } from "oh-my-opencode"
+
+const experimental: ExperimentalConfig = {
+  aggressive_truncation: false,
+  auto_resume: true,
+  dynamic_context_pruning: {
+    enabled: true,
+    notification: "minimal",
+    turn_protection: {
+      enabled: true,
+      turns: 3
+    }
+  }
+}
+```
+
+## Performance Considerations
+
+- **aggressive_truncation**: Reduces context size but may lose important information
+- **preemptive_compaction**: Improves performance but adds processing overhead
+- **dynamic_context_pruning**: Best for long sessions, minimal overhead when disabled
+- **plugin_load_timeout_ms**: Increase if plugins fail to load on slow systems
+
+## Stability Warnings
+
+Experimental features may:
+- Change behavior in future versions
+- Have incomplete documentation
+- Cause unexpected side effects
+- Be removed without notice
+
+Use in production at your own risk.
+
+## Related
+
+- [Configuration Schema](/api/config/schema)
+- [Agent Overrides](/api/config/agents)

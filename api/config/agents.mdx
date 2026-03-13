@@ -1,0 +1,520 @@
+---
+title: "Agent Overrides"
+description: "Configure agent-specific settings with 21 override fields per agent"
+---
+
+## Overview
+
+Agent overrides allow you to customize the behavior of individual agents with 21 configuration fields per agent. Each agent can have its own model, temperature, tools, permissions, and more.
+
+Defined in `src/config/schema/agent-overrides.ts`
+
+## Overridable Agents
+
+14 agents support configuration overrides:
+
+- `build`
+- `plan`
+- `sisyphus`
+- `hephaestus`
+- `sisyphus-junior`
+- `OpenCode-Builder`
+- `prometheus`
+- `metis`
+- `momus`
+- `oracle`
+- `librarian`
+- `explore`
+- `multimodal-looker`
+- `atlas`
+
+## AgentOverrideConfig Fields
+
+<ParamField path="model" type="string" optional deprecated>
+  **Deprecated:** Use `category` instead. Model is inherited from category defaults.
+  
+  Direct model specification (e.g., `anthropic/claude-opus-4-5`)
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "model": "anthropic/claude-opus-4-5"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="fallback_models" type="string | string[]" optional>
+  Fallback model(s) when primary model fails
+  
+  Can be a single model string or array of models
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "fallback_models": ["openai/gpt-5.4", "google/gemini-3-pro"]
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="variant" type="string" optional>
+  Model variant (e.g., `20250514` for Claude dated versions)
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "variant": "20250514"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="category" type="string" optional>
+  Category name to inherit model and other settings from CategoryConfig
+  
+  Built-in categories: `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "category": "ultrabrain"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="skills" type="string[]" optional>
+  Skill names to inject into agent prompt
+  
+  Built-in skills: `playwright`, `agent-browser`, `dev-browser`, `frontend-ui-ux`, `git-master`
+  
+  ```json
+  {
+    "agents": {
+      "hephaestus": {
+        "skills": ["git-master", "frontend-ui-ux"]
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="temperature" type="number" optional>
+  Sampling temperature (0.0 to 2.0)
+  
+  Lower values = more deterministic, higher values = more creative
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "temperature": 0.8
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="top_p" type="number" optional>
+  Nucleus sampling parameter (0.0 to 1.0)
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "top_p": 0.95
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="prompt" type="string" optional>
+  Full custom prompt for agent (replaces default)
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "prompt": "You are a task orchestrator..."
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="prompt_append" type="string" optional>
+  Text to append to agent prompt
+  
+  Supports file:// URIs:
+  - `file:///absolute/path`
+  - `file://./relative/path`
+  - `file://~/home/relative`
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "prompt_append": "file://~/.opencode/custom-instructions.txt"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="tools" type="Record<string, boolean>" optional>
+  Enable/disable specific tools for this agent
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "tools": {
+          "todowrite": true,
+          "bash": false
+        }
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="disable" type="boolean" optional>
+  Disable this agent completely
+  
+  ```json
+  {
+    "agents": {
+      "oracle": {
+        "disable": true
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="description" type="string" optional>
+  Agent description (shown in UI)
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "description": "Task orchestrator and delegation expert"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="mode" type="enum" optional>
+  Agent mode: `subagent`, `primary`, or `all`
+  
+  - `primary`: Respects UI model selection
+  - `subagent`: Uses own fallback chain
+  - `all`: Works in both modes
+  
+  ```json
+  {
+    "agents": {
+      "hephaestus": {
+        "mode": "subagent"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="color" type="string" optional>
+  Agent color in UI (hex format)
+  
+  Must match regex: `^#[0-9A-Fa-f]{6}$`
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "color": "#FF6B6B"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="permission" type="object" optional>
+  Agent permissions configuration
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "permission": {
+          "allow_file_write": true,
+          "allow_network": false
+        }
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="maxTokens" type="number" optional>
+  Maximum tokens for response
+  
+  Passed directly to OpenCode SDK
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "maxTokens": 8000
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="thinking" type="object" optional>
+  Extended thinking configuration (Anthropic)
+  
+  Overrides category and default settings
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "thinking": {
+          "type": "enabled",
+          "budgetTokens": 10000
+        }
+      }
+    }
+  }
+  ```
+  
+  <ParamField path="thinking.type" type="enum" required>
+    `enabled` or `disabled`
+  </ParamField>
+  
+  <ParamField path="thinking.budgetTokens" type="number" optional>
+    Token budget for thinking
+  </ParamField>
+</ParamField>
+
+<ParamField path="reasoningEffort" type="enum" optional>
+  Reasoning effort level (OpenAI)
+  
+  Values: `low`, `medium`, `high`, `xhigh`
+  
+  Overrides category and default settings
+  
+  ```json
+  {
+    "agents": {
+      "oracle": {
+        "reasoningEffort": "high"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="textVerbosity" type="enum" optional>
+  Text verbosity level
+  
+  Values: `low`, `medium`, `high`
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "textVerbosity": "medium"
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="providerOptions" type="Record<string, unknown>" optional>
+  Provider-specific options
+  
+  Passed directly to OpenCode SDK
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "providerOptions": {
+          "stop_sequences": ["###"],
+          "max_retries": 3
+        }
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="ultrawork" type="object" optional>
+  Per-message ultrawork override model/variant
+  
+  Triggered when `ultrawork` keyword is detected in message
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "ultrawork": {
+          "model": "anthropic/claude-opus-4-5",
+          "variant": "20250514"
+        }
+      }
+    }
+  }
+  ```
+  
+  <ParamField path="ultrawork.model" type="string" optional>
+    Model to use for ultrawork mode
+  </ParamField>
+  
+  <ParamField path="ultrawork.variant" type="string" optional>
+    Variant to use for ultrawork mode
+  </ParamField>
+</ParamField>
+
+<ParamField path="compaction" type="object" optional>
+  Compaction model override
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "compaction": {
+          "model": "anthropic/claude-haiku-4",
+          "variant": "20250514"
+        }
+      }
+    }
+  }
+  ```
+  
+  <ParamField path="compaction.model" type="string" optional>
+    Model to use for compaction
+  </ParamField>
+  
+  <ParamField path="compaction.variant" type="string" optional>
+    Variant to use for compaction
+  </ParamField>
+</ParamField>
+
+## Hephaestus-Specific Config
+
+Hephaestus has one additional field:
+
+<ParamField path="allow_non_gpt_model" type="boolean" optional>
+  Allow non-GPT models for Hephaestus (normally requires OpenAI-compatible providers)
+  
+  ```json
+  {
+    "agents": {
+      "hephaestus": {
+        "allow_non_gpt_model": true
+      }
+    }
+  }
+  ```
+</ParamField>
+
+## Complete Example
+
+```json
+{
+  "agents": {
+    "sisyphus": {
+      "category": "ultrabrain",
+      "temperature": 0.8,
+      "top_p": 0.95,
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 10000
+      },
+      "fallback_models": [
+        "openai/gpt-5.4",
+        "google/gemini-3-pro"
+      ],
+      "skills": ["git-master"],
+      "tools": {
+        "todowrite": true,
+        "task": true
+      },
+      "maxTokens": 8000,
+      "color": "#FF6B6B",
+      "ultrawork": {
+        "model": "anthropic/claude-opus-4-5",
+        "variant": "20250514"
+      }
+    },
+    "hephaestus": {
+      "category": "quick",
+      "temperature": 0.5,
+      "mode": "subagent",
+      "allow_non_gpt_model": false,
+      "skills": ["frontend-ui-ux"]
+    },
+    "oracle": {
+      "category": "deep",
+      "reasoningEffort": "high",
+      "fallback_models": "openai/gpt-5.4",
+      "textVerbosity": "high"
+    },
+    "librarian": {
+      "disable": true
+    }
+  }
+}
+```
+
+## Model Resolution Priority
+
+4-step resolution process:
+
+1. **Agent override** (`agents.sisyphus.model`)
+2. **Category default** (`agents.sisyphus.category` → `categories.ultrabrain.model`)
+3. **Provider fallback** (fallback chain from `fallback_models`)
+4. **System default** (plugin default model)
+
+## TypeScript Types
+
+```typescript
+import type { AgentOverrideConfig, AgentOverrides } from "oh-my-opencode"
+
+const sisyphusConfig: AgentOverrideConfig = {
+  category: "ultrabrain",
+  temperature: 0.8,
+  thinking: {
+    type: "enabled",
+    budgetTokens: 10000
+  }
+}
+
+const allAgents: AgentOverrides = {
+  sisyphus: sisyphusConfig,
+  hephaestus: {
+    category: "quick",
+    temperature: 0.5
+  }
+}
+```
+
+## Related
+
+- [Configuration Schema](/api/config/schema)
+- [Categories](/api/config/categories)

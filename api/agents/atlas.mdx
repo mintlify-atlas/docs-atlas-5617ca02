@@ -1,0 +1,298 @@
+---
+title: Atlas Agent
+description: Master orchestrator that executes todo lists until fully complete
+---
+
+## Overview
+
+Atlas is the master orchestrator agent that executes work plans via task delegation. Named after the Greek Titan who held up the sky, Atlas carries the weight of coordinating multiple specialized agents to complete ALL tasks in a todo list.
+
+**Philosophy**: Orchestrate work via `task()` to complete ALL tasks until fully done.
+
+## Key Characteristics
+
+- **Mode**: `all` (available as both primary and subagent)
+- **Temperature**: `0.1`
+- **Default Model**: `claude-sonnet-4-6`
+- **Cost**: EXPENSIVE
+- **Color**: `#10B981` (Emerald Green)
+
+## Core Competencies
+
+- Todo list orchestration and execution
+- Multi-agent coordination
+- Parallel task execution
+- Category + skills delegation strategy
+- Continuous verification and progress tracking
+
+## Model Fallback Chain
+
+1. **claude-sonnet-4-6** - Anthropic, GitHub Copilot, OpenCode
+2. **gpt-5.4** (medium) - OpenAI, GitHub Copilot, OpenCode
+3. **gemini-3-flash** - Google, GitHub Copilot, OpenCode
+
+## Tool Restrictions
+
+- **Allowed**: Most tools except delegation tools
+- **Denied**: `task`, `call_omo_agent` (Atlas orchestrates, doesn't delegate further)
+- **Question Permission**: `allow`
+
+## Configuration
+
+### Basic Configuration
+
+```json
+{
+  "agents": {
+    "atlas": {
+      "model": "claude-sonnet-4-6"
+    }
+  }
+}
+```
+
+### Configuration Options
+
+<ParamField path="agents.atlas.model" type="string">
+  Model to use for Atlas. Overrides the fallback chain.
+</ParamField>
+
+<ParamField path="agents.atlas.variant" type="string">
+  Reasoning effort variant: `low`, `medium`, `high`, `max`, or `xhigh`
+</ParamField>
+
+<ParamField path="agents.atlas.temperature" type="number" default="0.1">
+  Temperature for response generation (0.0-1.0)
+</ParamField>
+
+## How Atlas Works
+
+### Input: Todo List Path
+
+Atlas is invoked with a path to a work plan:
+
+```
+.sisyphus/plans/add-authentication.md
+```
+
+### Execution Flow
+
+1. **Read the plan** - Parse tasks, dependencies, success criteria
+2. **Identify parallelizable tasks** - Group independent tasks
+3. **Delegate via task()** - Fire agents with category + skills
+4. **Monitor progress** - Track completions, handle failures
+5. **Verify results** - Check success criteria after each task
+6. **Final verification** - Run acceptance criteria when all tasks complete
+7. **Report completion** - Summarize work done
+
+### Category + Skills Delegation
+
+Atlas delegates using category + skills combinations:
+
+```typescript
+task(
+  category="visual-engineering",
+  load_skills=["playwright", "component-driven"],
+  description="Implement login form UI",
+  prompt="[Detailed task instructions]"
+)
+```
+
+## Categories Available
+
+Atlas can delegate to these built-in categories:
+
+- **ultrabrain**: Complex reasoning and planning
+- **quick**: Fast, simple tasks
+- **visual-engineering**: UI/UX implementation
+- **backend**: Server-side logic
+- **testing**: Test creation and debugging
+- **refactoring**: Code restructuring
+- **documentation**: Writing docs
+- **infrastructure**: DevOps and deployment
+
+*Plus any custom categories defined in config*
+
+## Skills System
+
+Atlas loads relevant skills for each task:
+
+```typescript
+// Skills inform the agent about domain-specific context
+load_skills=[
+  "playwright",      // Browser automation expertise
+  "react-patterns",  // React best practices
+  "accessibility"    // WCAG compliance
+]
+```
+
+## Agent Selection Strategy
+
+Atlas uses a decision matrix to choose the right approach:
+
+### When to Use Specialized Agents
+
+- **Oracle**: Complex architectural decisions, hard debugging
+- **Explore**: Multi-angle codebase search
+- **Librarian**: External library research
+- **Metis**: Pre-planning for ambiguous tasks
+- **Momus**: Plan review before execution
+
+### When to Use Categories
+
+For implementation work, Atlas delegates to categories with appropriate skills.
+
+## Parallel Execution
+
+Atlas maximizes throughput via parallelization:
+
+```typescript
+// Independent tasks fire simultaneously
+task(category="backend", description="API endpoint", prompt="...")
+task(category="visual-engineering", description="UI component", prompt="...")
+task(category="testing", description="Integration tests", prompt="...")
+
+// Atlas waits for all to complete before proceeding to dependent tasks
+```
+
+## Verification Strategy
+
+Atlas verifies at multiple levels:
+
+### Per-Task Verification
+
+After each task completes:
+- Check task-specific success criteria
+- Run QA scenarios from the plan
+- Verify deliverables exist and work
+
+### Checkpoint Verification
+
+After logical groups:
+- Run integration tests
+- Check cross-task dependencies
+- Verify no regressions
+
+### Final Verification Wave
+
+After ALL tasks complete:
+- Run full acceptance criteria
+- Execute end-to-end tests
+- Confirm all deliverables present
+- Check nothing was missed
+
+## Failure Handling
+
+When a task fails:
+
+1. **Analyze failure** - Read error output
+2. **Determine recovery** - Can it be retried? Fixed? Needs replanning?
+3. **Attempt fix** - Retry with additional context or constraints
+4. **Escalate if needed** - Consult Oracle for complex failures
+5. **Report blockers** - If unrecoverable, inform user with context
+
+## Usage Examples
+
+### Example 1: Execute Feature Implementation Plan
+
+**User**: Execute `.sisyphus/plans/add-dark-mode.md`
+
+**Atlas**:
+1. Reads plan → 5 tasks identified
+2. Task 1-2 are independent → fires both in parallel (theme system + toggle component)
+3. Waits for completion, verifies both
+4. Task 3 depends on 1-2 → fires (apply theme to existing components)
+5. Task 4-5 are independent → fires both (tests + docs)
+6. Final verification: runs all tests, checks theme switching works
+7. Reports: "Dark mode implementation complete. 5/5 tasks done. All tests passing."
+
+### Example 2: Execute Refactoring Plan with Verification
+
+**User**: Execute `.sisyphus/plans/refactor-auth-module.md`
+
+**Atlas**:
+1. Reads plan → sees pre-refactor verification requirements
+2. Runs existing tests → baseline established
+3. Task 1: Extract auth logic → fires category="refactoring"
+4. Verifies: Tests still pass, no behavior change
+5. Task 2: Update imports → fires category="refactoring"  
+6. Verifies: LSP diagnostics clean
+7. Task 3: Add new tests → fires category="testing"
+8. Final verification: Full test suite, coverage check
+9. Reports: "Refactoring complete. Tests pass. Coverage +5%."
+
+### Example 3: Handle Failures Gracefully
+
+**User**: Execute `.sisyphus/plans/migrate-database.md`
+
+**Atlas**:
+1. Task 1: Backup database → SUCCESS
+2. Task 2: Run migration → FAILURE (constraint violation)
+3. Analyzes error → data inconsistency found
+4. Fires Oracle for migration strategy advice
+5. Oracle suggests: Fix data first, then migrate
+6. Creates interim task: Data cleanup
+7. Fires category="backend" with data fix
+8. Retries migration → SUCCESS
+9. Continues with remaining tasks
+10. Reports: "Migration complete. Had to fix data inconsistency first."
+
+## When to Use Atlas
+
+**Use when:**
+- User provides a todo list path (`.sisyphus/plans/*.md`)
+- Multiple tasks need to be completed in sequence or parallel
+- Work requires coordination across multiple specialized agents
+- You want systematic execution with verification
+- Complex workflow needs orchestration
+
+**Avoid when:**
+- Single simple task that doesn't require orchestration
+- Tasks can be handled directly by one agent
+- User wants to execute tasks manually step-by-step
+- Planning phase (use Prometheus to create plan first)
+
+## Decision Matrix
+
+Atlas uses this matrix to decide delegation approach:
+
+| Situation | Delegate To | Reason |
+|-----------|-------------|--------|
+| UI implementation | visual-engineering + skills | Specialized UI expertise |
+| Backend logic | backend + skills | Server-side focus |
+| Complex architecture | Oracle consultation | Strategic advice needed |
+| External library research | Librarian | Documentation search |
+| Codebase pattern discovery | Explore | Contextual grep |
+| Ambiguous requirements | Metis → Prometheus | Planning needed |
+| Simple focused task | quick + skills | Fast execution |
+| Deep end-to-end work | ultrabrain + skills | Autonomous completion |
+
+## Prompt Variants
+
+Atlas has optimized prompts for different model families:
+
+### Claude Prompt (Default)
+
+- Detailed orchestration instructions
+- Category + skills emphasis
+- Verification checkpoints
+
+### GPT Prompt
+
+- Principle-driven approach
+- Parallel execution focus
+- Systematic verification
+
+### Gemini Prompt
+
+- Step-by-step enforcement
+- Tool usage mandates
+- Progress tracking emphasis
+
+## Related Agents
+
+- **Prometheus**: Creates the work plans that Atlas executes
+- **Momus**: Reviews plans before Atlas executes them
+- **Sisyphus**: May delegate to Atlas for structured work
+- **Metis**: Pre-planning consultant (before Prometheus → Atlas flow)
+- **Oracle**: Consulted by Atlas for complex decisions during execution

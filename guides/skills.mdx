@@ -1,0 +1,453 @@
+---
+title: Skills
+description: Domain-specific workflows with embedded MCP servers and detailed instructions
+---
+
+## What Are Skills?
+
+A Skill is a mechanism that injects **specialized knowledge (Context)** and **tools (MCP)** for specific domains into agents. Skills provide:
+
+- **Specialized workflows:** Step-by-step instructions for complex tasks
+- **Embedded MCP servers:** Domain-specific tools (browser automation, git operations, etc.)
+- **Context injection:** Relevant knowledge and best practices
+- **Automatic triggering:** Load when keywords or patterns are detected
+
+<Note>
+Skills combine with Categories to create powerful specialized agents:
+- **Category:** "What kind of work is this?" (determines model, temperature, prompt mindset)
+- **Skill:** "What tools and knowledge are needed?" (injects specialized knowledge, MCP tools, workflows)
+</Note>
+
+## Built-in Skills
+
+### git-master
+
+**Triggers:** commit, rebase, squash, "who wrote", "when was X added"
+
+**Description:** Git expert combining three specializations:
+1. **Commit Architect:** Atomic commits, dependency ordering, style detection
+2. **Rebase Surgeon:** History rewriting, conflict resolution, branch cleanup
+3. **History Archaeologist:** Finding when/where specific changes were introduced
+
+**Core Principles:**
+
+<Warning>
+**MULTIPLE COMMITS BY DEFAULT (NON-NEGOTIABLE)**
+
+```plaintext
+3+ files -> MUST be 2+ commits (NO EXCEPTIONS)
+5+ files -> MUST be 3+ commits (NO EXCEPTIONS)
+10+ files -> MUST be 5+ commits (NO EXCEPTIONS)
+```
+</Warning>
+
+**Automatic Style Detection:**
+- Analyzes last 30 commits for language (Korean/English) and style (semantic/plain/short)
+- Matches your repo's commit conventions automatically
+
+**Usage:**
+
+```plaintext
+/git-master commit these changes
+/git-master rebase onto main
+/git-master who wrote this authentication code?
+```
+
+**Recommended:** Use with `task(category='quick', load_skills=['git-master'], ...)` to save context.
+
+### playwright
+
+**Triggers:** Browser tasks, testing, screenshots
+
+**Description:** Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.
+
+**MCP Server:** `@playwright/mcp@latest`
+
+**Capabilities:**
+- Navigate and interact with web pages
+- Take screenshots and PDFs
+- Fill forms and click elements
+- Wait for network requests
+- Scrape content
+
+**Usage:**
+
+```plaintext
+/playwright Navigate to example.com and take a screenshot
+```
+
+### playwright-cli
+
+**Triggers:** Browser tasks on Playwright CLI
+
+**Description:** Browser automation through the Playwright CLI integration. Useful when direct CLI scripting is preferred over MCP.
+
+### agent-browser
+
+**Triggers:** Browser tasks on agent-browser
+
+**Description:** Browser automation via the `agent-browser` CLI (Vercel). Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.
+
+**Installation:**
+
+```bash
+bun add -g agent-browser
+agent-browser install
+```
+
+**Configuration:**
+
+```json
+{
+  "browser_automation_engine": {
+    "provider": "agent-browser"
+  }
+}
+```
+
+### dev-browser
+
+**Triggers:** Stateful browser scripting
+
+**Description:** Browser automation with persistent page state for iterative workflows and authenticated sessions.
+
+### frontend-ui-ux
+
+**Triggers:** UI/UX tasks, styling
+
+**Description:** Designer-turned-developer persona. Crafts stunning UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.
+
+**Design Process:**
+
+1. **Purpose:** What problem does this solve? Who uses it?
+2. **Tone:** Pick an extreme - brutally minimal, maximalist chaos, retro-futuristic, organic/natural, luxury/refined, playful/toy-like
+3. **Constraints:** Technical requirements (framework, performance, accessibility)
+4. **Differentiation:** What's the ONE thing someone will remember?
+
+**Aesthetic Guidelines:**
+
+<Tabs>
+  <Tab title="Typography">
+    Choose distinctive fonts. **Avoid:** Arial, Inter, Roboto, system fonts, Space Grotesk. Pair a characterful display font with a refined body font.
+  </Tab>
+  <Tab title="Color">
+    Commit to a cohesive palette. Use CSS variables. Dominant colors with sharp accents outperform timid, evenly-distributed palettes. **Avoid:** purple gradients on white.
+  </Tab>
+  <Tab title="Motion">
+    Focus on high-impact moments. One well-orchestrated page load with staggered reveals > scattered micro-interactions. Use scroll-triggering and surprising hover states.
+  </Tab>
+</Tabs>
+
+**Anti-Patterns:**
+
+<Warning>
+- Generic fonts (Inter, Roboto, Arial, system fonts, Space Grotesk)
+- Cliched color schemes (purple gradients on white)
+- Predictable layouts and component patterns
+- Cookie-cutter design lacking context-specific character
+</Warning>
+
+## Browser Automation Options
+
+Oh My OpenAgent provides multiple browser automation providers:
+
+### Option 1: Playwright MCP (Default)
+
+```yaml
+mcp:
+  playwright:
+    command: npx
+    args: ["@playwright/mcp@latest"]
+```
+
+Auto-installed via npx on first use.
+
+### Option 2: Agent Browser CLI (Vercel)
+
+Requires manual installation:
+
+```bash
+bun add -g agent-browser
+agent-browser install
+```
+
+Enable in config:
+
+```json
+{
+  "browser_automation_engine": {
+    "provider": "agent-browser"
+  }
+}
+```
+
+## Custom Skill Creation
+
+You can create custom skills by adding `SKILL.md` files to your project.
+
+### Skill Load Locations
+
+Priority order (highest first):
+
+1. `.opencode/skills/*/SKILL.md` (project, OpenCode native)
+2. `~/.config/opencode/skills/*/SKILL.md` (user, OpenCode native)
+3. `.claude/skills/*/SKILL.md` (project, Claude Code compat)
+4. `.agents/skills/*/SKILL.md` (project, Agents convention)
+5. `~/.agents/skills/*/SKILL.md` (user, Agents convention)
+
+<Info>
+Same-named skill at higher priority overrides lower.
+</Info>
+
+### Basic Skill Format
+
+Create `.opencode/skills/my-skill/SKILL.md`:
+
+```markdown
+---
+name: my-skill
+description: My special custom skill
+---
+
+# My Skill Prompt
+
+This content will be injected into the agent's system prompt when this skill is loaded.
+
+## Instructions
+
+1. Do this first
+2. Then do this
+3. Finally do this
+
+## Best Practices
+
+- Always verify results
+- Follow existing patterns
+- Write clear commit messages
+```
+
+### Skill with Embedded MCP
+
+Skills can define their own MCP servers:
+
+```markdown
+---
+name: my-api-skill
+description: Custom API integration
+mcp:
+  my-mcp:
+    command: npx
+    args: ["-y", "my-mcp-server"]
+---
+
+# My API Skill
+
+Use the my-mcp tools to interact with the API:
+- `my_mcp_get` - Fetch data
+- `my_mcp_post` - Send data
+- `my_mcp_delete` - Remove data
+```
+
+### Skill with OAuth MCP
+
+Skills can define OAuth-protected remote MCP servers:
+
+```markdown
+---
+name: secure-api-skill
+description: OAuth-protected API integration
+mcp:
+  my-api:
+    url: https://api.example.com/mcp
+    oauth:
+      clientId: ${CLIENT_ID}
+      scopes: ["read", "write"]
+---
+
+# Secure API Skill
+
+This skill connects to an OAuth-protected API.
+```
+
+<Info>
+**OAuth Features:**
+- Auto-discovery via RFC 9728 / RFC 8414
+- Dynamic Client Registration (RFC 7591)
+- PKCE (mandatory for all flows)
+- Token storage in `~/.config/opencode/mcp-oauth.json`
+- Auto-refresh on 401
+</Info>
+
+Pre-authenticate via CLI:
+
+```bash
+bunx oh-my-opencode mcp oauth login my-api --server-url https://api.example.com
+```
+
+## Category + Skill Combinations
+
+Create powerful specialized agents by combining Categories and Skills:
+
+### The Designer (UI Implementation)
+
+```typescript
+task({
+  category: "visual-engineering",
+  load_skills: ["frontend-ui-ux", "playwright"],
+  prompt: "Implement the landing page hero section"
+})
+```
+
+**Effect:** Implements aesthetic UI and verifies rendering results directly in browser.
+
+### The Architect (Design Review)
+
+```typescript
+task({
+  category: "ultrabrain",
+  load_skills: [],
+  prompt: "Review the authentication system architecture"
+})
+```
+
+**Effect:** Leverages GPT-5.4 xhigh reasoning for in-depth system architecture analysis.
+
+### The Maintainer (Quick Fixes)
+
+```typescript
+task({
+  category: "quick",
+  load_skills: ["git-master"],
+  prompt: "Fix typo in README and commit"
+})
+```
+
+**Effect:** Uses cost-effective models to quickly fix code and generate clean commits.
+
+### The Historian (Code Archaeology)
+
+```typescript
+task({
+  category: "quick",
+  load_skills: ["git-master"],
+  prompt: "When was the authentication middleware added?"
+})
+```
+
+**Effect:** Uses git history search tools to find when specific code was introduced.
+
+## Skill Configuration
+
+Customize skills in your config:
+
+```jsonc
+{
+  "skills": {
+    // Load skills from custom locations
+    "sources": [
+      { "path": "./my-skills", "recursive": true },
+      "https://example.com/skill.yaml"
+    ],
+    
+    // Enable specific skills
+    "enable": ["my-skill"],
+    
+    // Disable specific skills
+    "disable": ["other-skill"],
+    
+    // Override skill settings
+    "git-master": {
+      "model": "opencode/gpt-5-nano",
+      "prompt_append": "Always use semantic commit style."
+    }
+  },
+  
+  // Disable built-in skills
+  "disabled_skills": ["playwright"]
+}
+```
+
+## Task Prompt Guide
+
+When delegating with skills, **clear and specific** prompts are essential. Include these 7 elements:
+
+1. **TASK:** What needs to be done? (single objective)
+2. **EXPECTED OUTCOME:** What is the deliverable?
+3. **REQUIRED SKILLS:** Which skills should be loaded via `load_skills`?
+4. **REQUIRED TOOLS:** Which tools must be used? (whitelist)
+5. **MUST DO:** What must be done (constraints)
+6. **MUST NOT DO:** What must never be done
+7. **CONTEXT:** File paths, existing patterns, reference materials
+
+### Bad Example
+
+```plaintext
+Fix this
+```
+
+### Good Example
+
+```plaintext
+TASK: Fix mobile layout breaking issue in LoginButton.tsx
+CONTEXT: src/components/LoginButton.tsx, using Tailwind CSS
+MUST DO: Change flex-direction at md: breakpoint
+MUST NOT DO: Modify existing desktop layout
+EXPECTED: Buttons align vertically on mobile
+```
+
+## Skill-Embedded MCPs
+
+Skills can bring their own MCP servers. The `skill_mcp` tool invokes these operations with full schema discovery.
+
+### Using Skill MCPs
+
+When a skill with an embedded MCP is loaded, its tools become available:
+
+```typescript
+// Load skill
+skill("playwright")
+
+// Use its MCP tools
+skill_mcp({
+  skill_name: "playwright",
+  server_name: "playwright",
+  tool_name: "playwright_navigate",
+  arguments: { url: "https://example.com" }
+})
+```
+
+### MCP Tool Discovery
+
+The system automatically discovers available tools from skill MCPs:
+
+```bash
+# List all MCP servers from loaded skills
+skill_mcp(skill_name="playwright", action="list_servers")
+
+# List tools from a specific MCP server
+skill_mcp(
+  skill_name="playwright",
+  server_name="playwright",
+  action="list_tools"
+)
+```
+
+## Disabling Skills
+
+Disable built-in skills:
+
+```json
+{
+  "disabled_skills": ["playwright", "frontend-ui-ux"]
+}
+```
+
+Disable specific skills in the skills config:
+
+```json
+{
+  "skills": {
+    "disable": ["my-custom-skill"]
+  }
+}
+```

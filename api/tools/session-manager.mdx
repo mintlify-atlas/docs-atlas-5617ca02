@@ -1,0 +1,385 @@
+---
+title: Session Manager Tools
+description: Access and search historical session data
+---
+
+## Overview
+
+Session Manager tools provide access to historical session data, enabling agents to search past conversations, read previous session transcripts, and learn from prior work.
+
+## Available Tools
+
+### session_list
+
+List all sessions for the current project.
+
+<ParamField path="limit" type="number">
+  Maximum number of sessions to return
+</ParamField>
+
+<ParamField path="from_date" type="string">
+  Filter sessions from this date (ISO 8601 format: YYYY-MM-DD)
+</ParamField>
+
+<ParamField path="to_date" type="string">
+  Filter sessions until this date (ISO 8601 format)
+</ParamField>
+
+<ParamField path="project_path" type="string">
+  Filter sessions by project path (default: current directory)
+</ParamField>
+
+**Returns:** List of session IDs with metadata (creation time, title)
+
+**Examples:**
+
+```typescript
+// List all sessions
+session_list({})
+
+// Recent 10 sessions
+session_list({ limit: 10 })
+
+// Sessions from last week
+session_list({
+  from_date: "2026-03-06",
+  to_date: "2026-03-13"
+})
+
+// Sessions for specific project
+session_list({
+  project_path: "/home/user/my-project",
+  limit: 20
+})
+```
+
+### session_read
+
+Read messages from a specific session.
+
+<ParamField path="session_id" type="string" required>
+  Session ID to read
+</ParamField>
+
+<ParamField path="include_todos" type="boolean">
+  Include todo list if available (default: false)
+</ParamField>
+
+<ParamField path="include_transcript" type="boolean">
+  Include transcript log if available (default: false)
+</ParamField>
+
+<ParamField path="limit" type="number">
+  Maximum number of messages to return (default: all)
+</ParamField>
+
+**Returns:** Session transcript with messages, tool calls, and optional todos
+
+**Examples:**
+
+```typescript
+// Read full session
+session_read({
+  session_id: "ses_abc123"
+})
+
+// Read with todos
+session_read({
+  session_id: "ses_abc123",
+  include_todos: true
+})
+
+// Read last 20 messages
+session_read({
+  session_id: "ses_abc123",
+  limit: 20
+})
+```
+
+### session_search
+
+Search across session transcripts.
+
+<ParamField path="query" type="string" required>
+  Search query string
+</ParamField>
+
+<ParamField path="session_id" type="string">
+  Search within specific session only (default: all sessions)
+</ParamField>
+
+<ParamField path="case_sensitive" type="boolean">
+  Case-sensitive search (default: false)
+</ParamField>
+
+<ParamField path="limit" type="number">
+  Maximum number of results to return (default: 20)
+</ParamField>
+
+**Returns:** Search results with session ID, message excerpt, and match context
+
+**Examples:**
+
+```typescript
+// Search all sessions
+session_search({
+  query: "authentication bug"
+})
+
+// Search specific session
+session_search({
+  query: "refactor",
+  session_id: "ses_abc123"
+})
+
+// Case-sensitive search
+session_search({
+  query: "UserController",
+  case_sensitive: true,
+  limit: 10
+})
+```
+
+### session_info
+
+Get metadata about a specific session.
+
+<ParamField path="session_id" type="string" required>
+  Session ID to inspect
+</ParamField>
+
+**Returns:** Session metadata including:
+- Session ID
+- Creation time
+- Last activity time
+- Title
+- Agent used
+- Message count
+- Tool calls count
+
+**Example:**
+
+```typescript
+session_info({
+  session_id: "ses_abc123"
+})
+```
+
+## Output Format
+
+### session_list Output
+
+```
+Sessions (10 total):
+
+1. ses_abc123 - "Fix authentication bug" (2026-03-13 10:30:00)
+2. ses_def456 - "Refactor user controller" (2026-03-12 15:45:00)
+3. ses_ghi789 - "Add API tests" (2026-03-11 09:15:00)
+...
+```
+
+### session_read Output
+
+```
+Session: ses_abc123
+Title: Fix authentication bug
+Created: 2026-03-13 10:30:00
+
+--- Messages (15) ---
+
+[User] Please fix the authentication bug in src/auth.ts
+
+[Assistant] I'll analyze the authentication code and identify the issue.
+
+[Tool: read] src/auth.ts
+[Result] ...
+
+[Assistant] Found the issue. The token validation is missing...
+
+--- Todos (3 incomplete, 2 complete) ---
+
+☐ Fix token validation in src/auth.ts
+☐ Add unit tests for auth flow
+☑ Read authentication code
+☑ Identify the bug
+☐ Update documentation
+```
+
+### session_search Output
+
+```
+Search results for "authentication bug" (3 matches):
+
+1. Session: ses_abc123
+   Date: 2026-03-13 10:30:00
+   Match: "Please fix the authentication bug in src/auth.ts"
+   
+2. Session: ses_def456
+   Date: 2026-03-10 14:20:00
+   Match: "...similar to the authentication bug we fixed last week..."
+
+3. Session: ses_ghi789
+   Date: 2026-03-08 11:05:00
+   Match: "The authentication bug is caused by missing token validation"
+```
+
+### session_info Output
+
+```
+Session Information:
+
+ID: ses_abc123
+Title: Fix authentication bug
+Agent: sisyphus
+Created: 2026-03-13 10:30:00
+Last Activity: 2026-03-13 11:45:00
+Duration: 1h 15m
+
+Messages: 15
+Tool Calls: 8
+Files Modified: 3
+```
+
+## Implementation Details
+
+### Storage Backend
+
+Sessions stored in OpenCode's storage:
+- Location: `~/.opencode/sessions/`
+- Format: JSON (messages, metadata)
+- SDK access via `ctx.client.storage`
+
+### Search Algorithm
+
+Search implementation:
+- Scans up to **50 sessions** max
+- Returns up to **20 results** (configurable)
+- **60 second timeout** for search operations
+- Case-insensitive by default
+
+### Date Filtering
+
+Date filters use ISO 8601 format:
+- `from_date`: inclusive start date
+- `to_date`: inclusive end date
+- Example: `"2026-03-13"`
+
+## Common Use Cases
+
+### Find Previous Solution
+
+```typescript
+// Search for similar problem
+const results = session_search({
+  query: "database connection pool",
+  limit: 5
+})
+
+// Read the most relevant session
+if (results.length > 0) {
+  const session = session_read({
+    session_id: results[0].session_id
+  })
+}
+```
+
+### Review Recent Work
+
+```typescript
+// Get last 5 sessions
+const sessions = session_list({ limit: 5 })
+
+// Read each session summary
+for (const session of sessions) {
+  const info = session_info({ session_id: session.id })
+  console.log(`${info.title}: ${info.message_count} messages`)
+}
+```
+
+### Check Todo Status
+
+```typescript
+// Read session with todos
+const session = session_read({
+  session_id: "ses_abc123",
+  include_todos: true
+})
+
+// Check if todos are complete
+if (session.todos?.some(t => !t.completed)) {
+  console.log("Session has incomplete todos")
+}
+```
+
+### Debug Failed Session
+
+```typescript
+// Find failed sessions
+const sessions = session_list({
+  from_date: "2026-03-01",
+  limit: 50
+})
+
+// Search for errors
+for (const session of sessions) {
+  const results = session_search({
+    query: "Error:",
+    session_id: session.id
+  })
+  
+  if (results.length > 0) {
+    console.log(`Errors in ${session.id}`)
+  }
+}
+```
+
+## Performance Considerations
+
+### Search Limits
+
+- Max sessions scanned: **50**
+- Default result limit: **20**
+- Timeout: **60 seconds**
+
+For large session histories, use date filtering to narrow scope:
+
+```typescript
+session_search({
+  query: "...",
+  from_date: "2026-03-01",  // Narrows search space
+  limit: 10
+})
+```
+
+### Message Limits
+
+Large sessions can be truncated:
+
+```typescript
+// Read recent messages only
+session_read({
+  session_id: "ses_abc123",
+  limit: 50  // Last 50 messages
+})
+```
+
+## Configuration
+
+Disable session tools in config:
+
+```json
+{
+  "disabled_tools": [
+    "session_list",
+    "session_read",
+    "session_search",
+    "session_info"
+  ]
+}
+```
+
+## Related Documentation
+
+- [Tools Overview](/api/tools/overview)
+- [Background Task](/api/tools/background-task)
+- [Hooks Overview](/api/hooks/overview)

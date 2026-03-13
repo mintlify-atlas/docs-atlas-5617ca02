@@ -1,0 +1,156 @@
+---
+title: Tools Overview
+description: Complete guide to the 26 built-in tools in Oh My OpenAgent
+---
+
+## Overview
+
+Oh My OpenAgent provides 26 specialized tools across 15 categories, enabling agents to perform code analysis, task management, session history access, and more. All tools are registered via `createToolRegistry()` and exposed to the LLM through the OpenCode plugin interface.
+
+## Tool Categories
+
+### Task Management (4 tools)
+
+Create and manage structured tasks with dependencies:
+
+- **task_create** - Create new tasks with metadata and dependencies
+- **task_list** - List all tasks in the system
+- **task_get** - Get detailed task information by ID
+- **task_update** - Update task status, metadata, or dependencies
+
+### Delegation (1 tool)
+
+Delegate work to specialized subagents:
+
+- **task** - Delegate tasks to subagents with category-specific models
+
+**Built-in Categories:**
+- `visual-engineering` - Frontend, UI/UX (Gemini 3.1 Pro high)
+- `ultrabrain` - Hard logic problems (GPT-5.4 xhigh)
+- `deep` - Autonomous problem-solving (GPT-5.3 Codex medium)
+- `artistry` - Creative approaches (Gemini 3.1 Pro high)
+- `quick` - Trivial tasks (Claude Haiku 4.5)
+- `unspecified-low` - Moderate effort (Claude Sonnet 4.6)
+- `unspecified-high` - High effort (Claude Opus 4.6 max)
+- `writing` - Documentation (Kimi k2p5)
+
+### Agent Invocation (1 tool)
+
+Direct agent invocation:
+
+- **call_omo_agent** - Invoke a specific Oh My OpenAgent agent
+
+### Background Tasks (2 tools)
+
+Manage long-running background operations:
+
+- **background_output** - Fetch results from running/completed background tasks
+- **background_cancel** - Cancel running background tasks
+
+### LSP Refactoring (6 tools)
+
+Language Server Protocol operations for code intelligence:
+
+- **lsp_goto_definition** - Jump to symbol definition
+- **lsp_find_references** - Find all references to a symbol
+- **lsp_symbols** - Get document outline or search workspace symbols
+- **lsp_diagnostics** - Get errors/warnings from language server
+- **lsp_prepare_rename** - Validate rename operation
+- **lsp_rename** - Perform safe symbol rename across workspace
+
+### Code Search (4 tools)
+
+Advanced code search and manipulation:
+
+- **ast_grep_search** - AST-aware pattern search (25 languages)
+- **ast_grep_replace** - AST-aware code replacement
+- **grep** - Fast text search with regex (60s timeout, 10MB limit)
+- **glob** - File pattern matching (60s timeout, 100 file limit)
+
+### Session History (4 tools)
+
+Access past session data:
+
+- **session_list** - List all sessions for current project
+- **session_read** - Read messages from a specific session
+- **session_search** - Search across session transcripts
+- **session_info** - Get metadata about a session
+
+### Skill/Command (2 tools)
+
+Load skills and MCP integrations:
+
+- **skill** - Load a skill with domain-specific instructions
+- **skill_mcp** - Invoke MCP (Model Context Protocol) tools/resources
+
+### System (2 tools)
+
+System interaction:
+
+- **interactive_bash** - Execute bash commands in tmux session
+- **look_at** - Analyze images or files with multimodal models
+
+### Editing (1 tool)
+
+Hash-anchored file editing:
+
+- **hashline_edit** - Edit files using LINE#ID references (conditional)
+
+## How to Use Tools
+
+### Tool Invocation
+
+Tools are automatically available to agents through the OpenCode plugin interface. The LLM receives tool schemas and can invoke them using the standard tool calling mechanism.
+
+### Tool Factories
+
+Most tools use factory functions:
+
+```typescript
+// Factory pattern for 19 tools
+const tool = createXXXTool(ctx, options)
+
+// Direct ToolDefinition for 7 tools (LSP + interactive_bash)
+const tool: ToolDefinition = lsp_goto_definition
+```
+
+### Tool Registration
+
+All tools are registered in `src/plugin/tool-registry.ts`:
+
+```typescript
+export function createToolRegistry(args: {
+  ctx: PluginContext
+  pluginConfig: OhMyOpenCodeConfig
+  managers: Managers
+  skillContext: SkillContext
+  availableCategories: AvailableCategory[]
+}): ToolRegistryResult
+```
+
+## Tool Disabling
+
+Disable specific tools in configuration:
+
+```json
+{
+  "disabled_tools": ["hashline_edit", "look_at"]
+}
+```
+
+## Adding New Tools
+
+To add a new tool:
+
+1. Create `src/tools/{name}/index.ts` with factory export
+2. Create `src/tools/{name}/types.ts` for parameter schemas
+3. Create `src/tools/{name}/tools.ts` for implementation
+4. Register in `src/plugin/tool-registry.ts`
+
+## Related Documentation
+
+- [LSP Tools](/api/tools/lsp) - Language Server Protocol tools
+- [AST-Grep](/api/tools/ast-grep) - Structural code search
+- [Hashline Edit](/api/tools/hashline-edit) - Hash-anchored editing
+- [Background Task](/api/tools/background-task) - Background execution
+- [Session Manager](/api/tools/session-manager) - Session history access

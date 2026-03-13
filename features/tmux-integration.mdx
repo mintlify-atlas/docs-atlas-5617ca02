@@ -1,0 +1,526 @@
+---
+title: Tmux Integration
+description: Interactive terminals, REPLs, debuggers, and TUI apps - all live in separate panes
+---
+
+## Overview
+
+Oh My OpenAgent integrates with tmux to provide:
+
+- **Interactive terminals**: Full TTY support for REPLs, debuggers, TUIs
+- **Visual multi-agent**: Watch background agents in separate panes
+- **Session persistence**: Work survives disconnects
+- **Grid layout**: Automatic pane management
+
+<Info>
+  Tmux is a terminal multiplexer. If you're unfamiliar, think of it as "screen tabs" but more powerful.
+</Info>
+
+## Interactive Bash Tool
+
+### Basic Usage
+
+The `interactive_bash` tool provides tmux-based interactive terminals:
+
+```typescript
+// Create a new tmux session
+interactive_bash({
+  tmux_command: "new-session -d -s dev-app"
+})
+
+// Send commands to the session
+interactive_bash({
+  tmux_command: "send-keys -t dev-app 'python' Enter"
+})
+
+// Interact with Python REPL
+interactive_bash({
+  tmux_command: "send-keys -t dev-app 'print(2+2)' Enter"
+})
+
+// Capture output
+interactive_bash({
+  tmux_command: "capture-pane -p -t dev-app"
+})
+// Output: ">>> print(2+2)\n4\n>>>"
+```
+
+### Key Differences from Regular Bash
+
+| Regular Bash | Interactive Bash (Tmux) |
+|-------------|-------------------------|
+| One-shot commands | Persistent sessions |
+| No TTY | Full TTY support |
+| Output only | Interactive I/O |
+| Process dies after | Process survives |
+
+### Tmux Command Format
+
+<Warning>
+  Pass tmux **subcommands** only - no `tmux` prefix!
+</Warning>
+
+```typescript
+// ✅ Correct
+interactive_bash({
+  tmux_command: "new-session -d -s my-session"
+})
+
+// ❌ Wrong - don't include 'tmux' prefix
+interactive_bash({
+  tmux_command: "tmux new-session -d -s my-session"
+})
+```
+
+## Use Cases
+
+### REPLs (Python, Node, Ruby)
+
+```typescript
+// Start Python REPL
+interactive_bash({
+  tmux_command: "new-session -d -s python-repl 'python'"
+})
+
+// Execute code
+interactive_bash({
+  tmux_command: "send-keys -t python-repl 'import requests' Enter"
+})
+
+interactive_bash({
+  tmux_command: "send-keys -t python-repl 'r = requests.get(\"https://api.github.com\")' Enter"
+})
+
+interactive_bash({
+  tmux_command: "send-keys -t python-repl 'print(r.status_code)' Enter"
+})
+
+// Get output
+interactive_bash({
+  tmux_command: "capture-pane -p -t python-repl -S -30"
+})
+```
+
+### Debuggers (pdb, pudb, gdb)
+
+```typescript
+// Start debugger
+interactive_bash({
+  tmux_command: "new-session -d -s debugger 'python -m pudb script.py'"
+})
+
+// Send debugger commands
+interactive_bash({
+  tmux_command: "send-keys -t debugger 'b main' Enter"  // Set breakpoint
+})
+
+interactive_bash({
+  tmux_command: "send-keys -t debugger 'c' Enter"       // Continue
+})
+
+interactive_bash({
+  tmux_command: "send-keys -t debugger 'p variable' Enter"  // Print variable
+})
+```
+
+### TUI Apps (vim, htop, etc.)
+
+```typescript
+// Start vim
+interactive_bash({
+  tmux_command: "new-session -d -s editor 'vim file.txt'"
+})
+
+// Send vim commands
+interactive_bash({
+  tmux_command: "send-keys -t editor 'i' 'Hello, world!' Escape ':wq' Enter"
+})
+```
+
+### Long-Running Processes
+
+```typescript
+// Start dev server
+interactive_bash({
+  tmux_command: "new-session -d -s dev-server 'npm run dev'"
+})
+
+// Check if running
+interactive_bash({
+  tmux_command: "capture-pane -p -t dev-server -S -10"
+})
+
+// Kill when done
+interactive_bash({
+  tmux_command: "send-keys -t dev-server C-c"  // Send Ctrl-C
+})
+```
+
+## Visual Multi-Agent Display
+
+### Enabling Tmux for Background Agents
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "tmux": {
+    "enabled": true,
+    "layout": "main-vertical"
+  }
+}
+```
+
+### How It Works
+
+When background agents run inside tmux:
+
+```
+┌─────────────────┬────────────────┐
+│                 │  Agent 1       │
+│                 │  [Explore]     │
+│   Main Pane     ├────────────────┤
+│   (Sisyphus)    │  Agent 2       │
+│                 │  [Librarian]   │
+│                 ├────────────────┤
+│                 │  Agent 3       │
+│                 │  [Deep Work]   │
+└─────────────────┴────────────────┘
+```
+
+- **Main pane**: Your primary agent (Sisyphus)
+- **Agent panes**: Background agents in separate panes
+- **Real-time**: Watch agents work live
+- **Auto-cleanup**: Panes close when agents complete
+
+### Layout Options
+
+<Tabs>
+  <Tab title="main-vertical (default)">
+    ```
+    ┌─────────┬──────┐
+    │         │  A1  │
+    │  Main   ├──────┤
+    │         │  A2  │
+    └─────────┴──────┘
+    ```
+    Main pane on left, agents stacked right.
+  </Tab>
+
+  <Tab title="main-horizontal">
+    ```
+    ┌─────────────────┐
+    │      Main       │
+    ├────────┬────────┤
+    │   A1   │   A2   │
+    └────────┴────────┘
+    ```
+    Main pane on top, agents in row below.
+  </Tab>
+
+  <Tab title="tiled">
+    ```
+    ┌────────┬────────┐
+    │  Main  │   A1   │
+    ├────────┼────────┤
+    │   A2   │   A3   │
+    └────────┴────────┘
+    ```
+    Equal-sized panes in grid.
+  </Tab>
+</Tabs>
+
+### Pane Constraints
+
+From `src/features/tmux-subagent/tmux-grid-constants.ts`:
+
+```typescript
+MIN_PANE_WIDTH = 52   // characters
+MIN_PANE_HEIGHT = 11  // lines
+MAX_COLS = 2
+MAX_ROWS = 3
+MAX_GRID_SIZE = 4     // Maximum agent panes visible
+```
+
+If window too small, panes won't split further.
+
+### Configuration
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "tmux": {
+    "enabled": true,
+    "layout": "main-vertical",
+    "main_pane_size": 50,          // Main pane percentage (20-80)
+    "main_pane_min_width": 80,     // Minimum main pane width
+    "agent_pane_width": 52         // Minimum agent pane width
+  }
+}
+```
+
+## Advanced Tmux Features
+
+### Session Management
+
+```typescript
+// List all tmux sessions
+interactive_bash({
+  tmux_command: "list-sessions"
+})
+
+// Attach to session (in terminal, not via agent)
+// $ tmux attach -t dev-app
+
+// Kill session
+interactive_bash({
+  tmux_command: "kill-session -t dev-app"
+})
+```
+
+### Pane Inspection
+
+```typescript
+// List panes
+interactive_bash({
+  tmux_command: "list-panes -s -t dev-app"
+})
+
+// Get pane content (last 50 lines)
+interactive_bash({
+  tmux_command: "capture-pane -p -t dev-app -S -50"
+})
+
+// Get entire scrollback
+interactive_bash({
+  tmux_command: "capture-pane -p -t dev-app -S -"
+})
+```
+
+### Keyboard Control
+
+```typescript
+// Send special keys
+interactive_bash({
+  tmux_command: "send-keys -t dev-app C-c"      // Ctrl-C
+})
+
+interactive_bash({
+  tmux_command: "send-keys -t dev-app C-d"      // Ctrl-D (EOF)
+})
+
+interactive_bash({
+  tmux_command: "send-keys -t dev-app C-z"      // Ctrl-Z (suspend)
+})
+
+interactive_bash({
+  tmux_command: "send-keys -t dev-app Escape"   // ESC key
+})
+```
+
+### Window Manipulation
+
+```typescript
+// Split pane horizontally
+interactive_bash({
+  tmux_command: "split-window -h -t dev-app"
+})
+
+// Split pane vertically
+interactive_bash({
+  tmux_command: "split-window -v -t dev-app"
+})
+
+// Resize pane
+interactive_bash({
+  tmux_command: "resize-pane -t dev-app -R 10"  // Right by 10 chars
+})
+```
+
+## Best Practices
+
+### When to Use Interactive Bash
+
+<CardGroup cols={2}>
+  <Card title="✅ Use Interactive Bash For" icon="check">
+    - REPLs (Python, Node, Ruby)
+    - Debuggers (pdb, gdb, lldb)
+    - TUI apps (vim, htop, less)
+    - Long-running processes (dev servers)
+    - Interactive prompts (SSH, sudo)
+  </Card>
+  <Card title="❌ Use Regular Bash For" icon="xmark">
+    - One-shot commands (ls, cat, grep)
+    - Build scripts (npm build, cargo build)
+    - Git operations (git commit, git push)
+    - File operations (cp, mv, rm)
+    - Anything that doesn't need TTY
+  </Card>
+</CardGroup>
+
+### Session Naming
+
+```typescript
+// ✅ Good: Descriptive names
+interactive_bash({ tmux_command: "new-session -d -s python-repl" })
+interactive_bash({ tmux_command: "new-session -d -s api-debugger" })
+interactive_bash({ tmux_command: "new-session -d -s dev-server" })
+
+// ❌ Bad: Generic names
+interactive_bash({ tmux_command: "new-session -d -s session1" })
+interactive_bash({ tmux_command: "new-session -d -s test" })
+```
+
+### Cleanup
+
+```typescript
+// Always cleanup sessions when done
+interactive_bash({ tmux_command: "kill-session -t python-repl" })
+
+// Or kill all sessions
+interactive_bash({ tmux_command: "kill-server" })
+```
+
+### Error Handling
+
+```typescript
+// Check if session exists before sending commands
+const result = interactive_bash({ tmux_command: "has-session -t dev-app" })
+
+if (result.includes("no server") || result.includes("can't find")) {
+  // Session doesn't exist, create it
+  interactive_bash({ tmux_command: "new-session -d -s dev-app" })
+}
+
+// Then send commands
+interactive_bash({ tmux_command: "send-keys -t dev-app 'python' Enter" })
+```
+
+## Troubleshooting
+
+### "no server running" Error
+
+**Symptom**: `interactive_bash` returns "no server running on /tmp/tmux-..."
+
+**Cause**: No tmux sessions exist
+
+**Solution**: Create a session first
+
+```typescript
+interactive_bash({ tmux_command: "new-session -d -s my-session" })
+```
+
+### "can't find session" Error
+
+**Symptom**: `send-keys` or `capture-pane` fails
+
+**Cause**: Session name wrong or session was killed
+
+**Solution**: Check session exists
+
+```typescript
+interactive_bash({ tmux_command: "list-sessions" })
+```
+
+### Empty Capture Output
+
+**Symptom**: `capture-pane` returns empty string
+
+**Cause**: Pane cleared or scrollback limit reached
+
+**Solution**: Increase scrollback or capture sooner
+
+```typescript
+// Set scrollback limit
+interactive_bash({ tmux_command: "set-option -g history-limit 10000" })
+```
+
+### Pane Not Splitting
+
+**Symptom**: Background agents not appearing in separate panes
+
+**Causes**:
+1. Not running inside tmux
+2. Window too small (< MIN_PANE_WIDTH)
+3. Max grid size reached (4 agents)
+
+**Solutions**:
+1. Start OpenCode inside tmux session
+2. Increase terminal window size
+3. Wait for agents to complete before starting more
+
+## Examples
+
+### Example 1: Python Test Runner
+
+```typescript
+// Start pytest with verbose output
+interactive_bash({
+  tmux_command: "new-session -d -s pytest 'pytest -v'"
+})
+
+// Wait a moment for tests to run
+await sleep(5000)
+
+// Get results
+const output = interactive_bash({
+  tmux_command: "capture-pane -p -t pytest -S -50"
+})
+
+console.log(output)
+```
+
+### Example 2: Database Migration
+
+```typescript
+// Start psql session
+interactive_bash({
+  tmux_command: "new-session -d -s psql 'psql -U postgres mydb'"
+})
+
+// Run migration
+interactive_bash({
+  tmux_command: "send-keys -t psql '\\i migrations/001_create_users.sql' Enter"
+})
+
+// Check for errors
+const result = interactive_bash({
+  tmux_command: "capture-pane -p -t psql -S -10"
+})
+
+if (result.includes("ERROR")) {
+  console.error("Migration failed!")
+} else {
+  console.log("Migration succeeded")
+}
+
+// Cleanup
+interactive_bash({ tmux_command: "kill-session -t psql" })
+```
+
+### Example 3: Interactive Vim Editing
+
+```typescript
+// Open file in vim
+interactive_bash({
+  tmux_command: "new-session -d -s vim 'vim config.json'"
+})
+
+// Navigate to line 5
+interactive_bash({
+  tmux_command: "send-keys -t vim ':5' Enter"
+})
+
+// Enter insert mode and add line
+interactive_bash({
+  tmux_command: "send-keys -t vim 'i' '  \"new_key\": \"value\",' Escape"
+})
+
+// Save and quit
+interactive_bash({
+  tmux_command: "send-keys -t vim ':wq' Enter"
+})
+```
+
+## Related Topics
+
+- [Background Agents](/features/background-agents) - Parallel task execution
+- [Interactive Bash Tool](/features/tmux-integration) - Tool reference
+- [Discipline Agents](/features/discipline-agents) - Agent orchestration

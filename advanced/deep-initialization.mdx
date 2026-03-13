@@ -1,0 +1,268 @@
+---
+title: Deep Initialization
+description: Auto-generate hierarchical AGENTS.md files throughout your project
+---
+
+## Overview
+
+The `/init-deep` command automatically generates hierarchical `AGENTS.md` files throughout your codebase. These files provide context to agents at each directory level, improving agent performance while optimizing token usage.
+
+<Info>
+  Deep initialization creates a knowledge base that agents auto-read when working in specific directories, eliminating the need for manual context injection.
+</Info>
+
+## How It Works
+
+When you run `/init-deep`, the system:
+
+1. **Discovers** your project structure using parallel analysis
+2. **Scores** each directory based on complexity and boundaries
+3. **Generates** AGENTS.md files at strategic locations
+4. **Reviews** content for quality and deduplication
+
+```
+project/
+├── AGENTS.md              ← project-wide context
+├── src/
+│   ├── AGENTS.md          ← src-specific context
+│   └── components/
+│       └── AGENTS.md      ← component-specific context
+```
+
+## Basic Usage
+
+```
+/init-deep                      # Update mode: modify existing + create new
+/init-deep --create-new         # Regenerate from scratch
+/init-deep --max-depth=2        # Limit directory depth (default: 3)
+```
+
+<CodeGroup>
+```bash Update existing
+/init-deep
+```
+
+```bash Fresh start
+/init-deep --create-new
+```
+
+```bash Limit depth
+/init-deep --max-depth=2
+```
+</CodeGroup>
+
+## Workflow
+
+### Phase 1: Discovery
+
+The agent launches **parallel background agents** to analyze your project:
+
+- Project structure analysis
+- Entry point detection
+- Convention discovery (config files, linters)
+- Anti-pattern identification
+- Build/CI analysis
+- Test pattern discovery
+
+<Note>
+  The number of agents scales dynamically based on project size. Larger projects spawn more agents for thorough analysis.
+</Note>
+
+While background agents run, the main session:
+
+- Runs bash structural analysis (directory depth, file counts)
+- Reads existing AGENTS.md files
+- Uses LSP for code mapping (if available)
+
+### Phase 2: Scoring
+
+Directories are scored using multiple factors:
+
+| Factor | Weight | High Threshold | Source |
+|--------|--------|----------------|--------|
+| File count | 3x | >20 | bash |
+| Subdir count | 2x | >5 | bash |
+| Code ratio | 2x | >70% | bash |
+| Unique patterns | 1x | Has own config | explore |
+| Module boundary | 2x | Has index.ts/__init__.py | bash |
+| Symbol density | 2x | >30 symbols | LSP |
+| Export count | 2x | >10 exports | LSP |
+| Reference centrality | 3x | >20 refs | LSP |
+
+**Decision Rules:**
+
+- **Root (.)**: Always created
+- **Score >15**: Create AGENTS.md
+- **Score 8-15**: Create if distinct domain
+- **Score &lt;8**: Skip (parent covers)
+
+### Phase 3: Generation
+
+The root AGENTS.md receives full treatment:
+
+- Project overview (1-2 sentences)
+- Directory structure (non-obvious only)
+- "Where to Look" table
+- Code map (from LSP)
+- Conventions (deviations from standard)
+- Anti-patterns (project-specific forbidden patterns)
+- Unique styles
+- Commands (dev/test/build)
+
+Subdirectory AGENTS.md files are:
+
+- Generated in parallel
+- 30-80 lines max
+- Never repeat parent content
+- Focus on directory-specific information
+
+<Warning>
+  If AGENTS.md already exists, the tool uses `Edit`. If it doesn't exist, it uses `Write`. Never manually overwrite without reading first.
+</Warning>
+
+### Phase 4: Review
+
+Each generated file is:
+
+- Stripped of generic advice
+- Deduplicated against parent files
+- Trimmed to size limits
+- Verified for telegraphic style
+
+## Dynamic Agent Spawning
+
+The system adjusts the number of exploration agents based on project scale:
+
+| Factor | Threshold | Additional Agents |
+|--------|-----------|-------------------|
+| **Total files** | >100 | +1 per 100 files |
+| **Total lines** | >10k | +1 per 10k lines |
+| **Directory depth** | ≥4 | +2 for deep exploration |
+| **Large files (>500 lines)** | >10 files | +1 for complexity hotspots |
+| **Monorepo** | detected | +1 per package/workspace |
+| **Multiple languages** | >1 | +1 per language |
+
+<Tip>
+  For a 500-file project with 50k lines and depth 6, the system spawns 5+5+2+1 = **13 additional agents** beyond the base 6.
+</Tip>
+
+## Example Output
+
+```markdown
+# PROJECT KNOWLEDGE BASE
+
+**Generated:** 2026-03-13
+**Commit:** 7fe4402
+**Branch:** dev
+
+## OVERVIEW
+
+OpenCode plugin that extends Claude Code with multi-agent orchestration and 46 lifecycle hooks.
+
+## STRUCTURE
+\`\`\`
+oh-my-opencode/
+├── src/
+│   ├── index.ts              # Plugin entry
+│   ├── plugin-config.ts      # JSONC multi-level config
+│   ├── agents/               # 11 agents
+│   ├── hooks/                # 46 hooks
+│   └── tools/                # 26 tools
+\`\`\`
+
+## WHERE TO LOOK
+
+| Task | Location | Notes |
+|------|----------|-------|
+| Add new agent | `src/agents/` + `src/agents/builtin-agents/` | Follow createXXXAgent factory |
+| Add new hook | `src/hooks/{name}/` + register in `src/plugin/hooks/` | Match event type to tier |
+| Add new tool | `src/tools/{name}/` + register in `src/plugin/tool-registry.ts` | Follow createXXXTool factory |
+
+## CONVENTIONS
+
+- **Runtime**: Bun only — never use npm/yarn
+- **TypeScript**: strict mode, ESNext, bundler moduleResolution
+- **Test pattern**: Bun test, co-located \`*.test.ts\`, given/when/then style
+- **Factory pattern**: \`createXXX()\` for all tools, hooks, agents
+
+## ANTI-PATTERNS
+
+- Never use \`as any\`, \`@ts-ignore\`, \`@ts-expect-error\`
+- Never add emojis to code/comments unless user explicitly asks
+- Never create catch-all files (\`utils.ts\`, \`helpers.ts\`)
+
+## COMMANDS
+
+\`\`\`bash
+bun test                    # Bun test suite
+bun run build              # Build plugin
+bunx oh-my-opencode doctor  # Health diagnostics
+\`\`\`
+```
+
+## Auto-Context Injection
+
+Once generated, AGENTS.md files are **automatically injected** into agent context when:
+
+- Reading files in that directory
+- Using LSP tools in that directory
+- Executing commands in that directory
+
+The injection walks from the file's directory to project root, collecting all AGENTS.md files:
+
+```
+Reading: project/src/components/Button.tsx
+
+Injected context:
+1. project/AGENTS.md              # Root context
+2. project/src/AGENTS.md          # Src context
+3. project/src/components/AGENTS.md  # Component context
+```
+
+<Info>
+  For OpenCode 1.1.37+, native AGENTS.md injection is used. For older versions, the directory-agents-injector hook handles it.
+</Info>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="When to regenerate">
+    - After major refactoring
+    - When adding new modules/features
+    - After changing project structure
+    - When onboarding new team members
+  </Accordion>
+
+  <Accordion title="Avoid over-documenting">
+    Not every directory needs AGENTS.md. Let the scoring system decide. Only override if:
+    - The directory has unique conventions
+    - Common mistakes happen there
+    - Non-obvious patterns exist
+  </Accordion>
+
+  <Accordion title="Keep it telegraphic">
+    AGENTS.md should be:
+    - Concise (50-150 lines for root, 30-80 for subdirs)
+    - No generic advice ("use descriptive names")
+    - No obvious information ("index.ts is the entry point")
+    - Only deviations and gotchas
+  </Accordion>
+</AccordionGroup>
+
+## Anti-Patterns to Avoid
+
+<Warning>
+  **Don't:**
+  - Use static agent counts (always scale based on project size)
+  - Run sequentially (always parallel: explore + LSP concurrent)
+  - Ignore existing files (always read existing first, even with --create-new)
+  - Over-document (not every dir needs AGENTS.md)
+  - Create redundancy (child never repeats parent)
+  - Add generic content (remove anything that applies to ALL projects)
+</Warning>
+
+## Related Features
+
+- [Prometheus Planner](/advanced/prometheus-planner) - Strategic planning before execution
+- [Ralph Loop](/advanced/ralph-loop) - Self-referential development loop
+- [Todo Enforcer](/advanced/todo-enforcer) - Task completion monitoring

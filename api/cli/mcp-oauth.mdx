@@ -1,0 +1,465 @@
+---
+title: "oh-my-opencode mcp oauth"
+description: "OAuth token management for MCP servers with PKCE authentication"
+---
+
+## Overview
+
+The `mcp oauth` command manages OAuth tokens for MCP (Model Context Protocol) servers. It supports PKCE-based authentication, token storage, and status checking.
+
+## Command Syntax
+
+```bash
+oh-my-opencode mcp oauth <subcommand> [options]
+```
+
+## Subcommands
+
+### login
+
+Authenticate with an MCP server using OAuth.
+
+```bash
+oh-my-opencode mcp oauth login <server-name> [options]
+```
+
+<ParamField path="server-name" type="string" required>
+  Name of the MCP server to authenticate with
+  
+  ```bash
+  oh-my-opencode mcp oauth login my-mcp-server
+  ```
+</ParamField>
+
+<ParamField path="--server-url" type="string">
+  OAuth server URL (required if not in config)
+  
+  ```bash
+  oh-my-opencode mcp oauth login my-server --server-url https://auth.example.com
+  ```
+</ParamField>
+
+<ParamField path="--client-id" type="string">
+  OAuth client ID
+  
+  Optional - uses Dynamic Client Registration (DCR) if not provided
+  
+  ```bash
+  oh-my-opencode mcp oauth login my-server --client-id my-client-id
+  ```
+</ParamField>
+
+<ParamField path="--scopes" type="string[]">
+  OAuth scopes to request
+  
+  Space-separated list of scopes
+  
+  ```bash
+  oh-my-opencode mcp oauth login my-server --scopes read write execute
+  ```
+</ParamField>
+
+#### Examples
+
+##### Basic Login
+
+```bash
+oh-my-opencode mcp oauth login context7
+```
+
+Uses server configuration from config file.
+
+##### Login with URL
+
+```bash
+oh-my-opencode mcp oauth login my-server \
+  --server-url https://auth.example.com \
+  --scopes read write
+```
+
+##### Login with Client ID
+
+```bash
+oh-my-opencode mcp oauth login my-server \
+  --server-url https://auth.example.com \
+  --client-id abc123 \
+  --scopes read write execute
+```
+
+### logout
+
+Remove stored OAuth tokens for an MCP server.
+
+```bash
+oh-my-opencode mcp oauth logout <server-name> [options]
+```
+
+<ParamField path="server-name" type="string" required>
+  Name of the MCP server to logout from
+  
+  ```bash
+  oh-my-opencode mcp oauth logout my-mcp-server
+  ```
+</ParamField>
+
+<ParamField path="--server-url" type="string">
+  OAuth server URL
+  
+  Use if server name differs from URL
+  
+  ```bash
+  oh-my-opencode mcp oauth logout my-server --server-url https://auth.example.com
+  ```
+</ParamField>
+
+#### Examples
+
+##### Basic Logout
+
+```bash
+oh-my-opencode mcp oauth logout context7
+```
+
+##### Logout with URL
+
+```bash
+oh-my-opencode mcp oauth logout my-server --server-url https://auth.example.com
+```
+
+### status
+
+Show OAuth token status for MCP servers.
+
+```bash
+oh-my-opencode mcp oauth status [server-name]
+```
+
+<ParamField path="server-name" type="string" optional>
+  Name of specific MCP server to check
+  
+  If omitted, shows status for all servers
+  
+  ```bash
+  oh-my-opencode mcp oauth status my-mcp-server
+  ```
+</ParamField>
+
+#### Examples
+
+##### All Servers Status
+
+```bash
+oh-my-opencode mcp oauth status
+```
+
+Output:
+```
+MCP OAuth Status
+
+context7
+  Status: ✓ Authenticated
+  Token: Valid until 2026-04-15
+  Scopes: read, write
+
+websearch
+  Status: ✗ Not authenticated
+  
+grep_app
+  Status: ✓ Authenticated
+  Token: Valid until 2026-03-20
+  Scopes: read
+```
+
+##### Single Server Status
+
+```bash
+oh-my-opencode mcp oauth status context7
+```
+
+Output:
+```
+context7
+  Status: ✓ Authenticated
+  Token: Valid until 2026-04-15
+  Scopes: read, write
+  Server URL: https://auth.context7.com
+  Client ID: abc123xyz
+```
+
+## Authentication Flow
+
+The OAuth login flow uses PKCE (Proof Key for Code Exchange):
+
+1. **Generate PKCE challenge**
+   - Creates code_verifier (random string)
+   - Creates code_challenge (SHA-256 hash)
+
+2. **Open browser for authorization**
+   - User logs in to OAuth server
+   - Grants permissions for requested scopes
+
+3. **Receive authorization code**
+   - OAuth server redirects to local callback
+   - Captures authorization code
+
+4. **Exchange code for token**
+   - Sends code + code_verifier to token endpoint
+   - Receives access token + refresh token
+
+5. **Store tokens**
+   - Saves tokens to secure storage
+   - Associates with server name
+
+## Token Storage
+
+Tokens are stored in:
+
+```
+~/.config/opencode/mcp-oauth-tokens.json
+```
+
+Format:
+```json
+{
+  "context7": {
+    "access_token": "eyJ...",
+    "refresh_token": "eyJ...",
+    "expires_at": 1744934400,
+    "scopes": ["read", "write"]
+  },
+  "grep_app": {
+    "access_token": "eyJ...",
+    "refresh_token": "eyJ...",
+    "expires_at": 1742256000,
+    "scopes": ["read"]
+  }
+}
+```
+
+**Security**: File permissions set to 600 (owner read/write only).
+
+## Dynamic Client Registration
+
+If `--client-id` is not provided, uses Dynamic Client Registration (DCR):
+
+```bash
+oh-my-opencode mcp oauth login my-server --server-url https://auth.example.com
+```
+
+Flow:
+1. Sends POST to `/register` endpoint
+2. Receives client_id and client_secret
+3. Uses for OAuth flow
+4. Stores client_id for future use
+
+## Token Refresh
+
+Tokens are automatically refreshed when expired:
+
+- MCP server checks token expiration before each request
+- If expired, uses refresh_token to get new access_token
+- Updates stored tokens transparently
+
+## Built-in MCP Servers
+
+Oh My OpenAgent includes 3 built-in remote MCPs:
+
+<ParamField path="websearch" type="MCP server">
+  Web search via Exa or Tavily
+  
+  Configured in:
+  ```json
+  {
+    "websearch": {
+      "provider": "exa"
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="context7" type="MCP server">
+  Context retrieval from external sources
+  
+  Requires OAuth authentication:
+  ```bash
+  oh-my-opencode mcp oauth login context7
+  ```
+</ParamField>
+
+<ParamField path="grep_app" type="MCP server">
+  Code search via grep.app
+  
+  May require OAuth for authenticated access:
+  ```bash
+  oh-my-opencode mcp oauth login grep_app
+  ```
+</ParamField>
+
+## Three-Tier MCP System
+
+Oh My OpenAgent supports MCPs from multiple sources:
+
+### 1. Built-in MCPs
+
+`src/mcp/` - 3 remote HTTP servers
+
+```json
+{
+  "disabled_mcps": ["websearch"]
+}
+```
+
+### 2. Claude Code MCPs
+
+`.mcp.json` - Standard MCP config with env expansion
+
+```json
+{
+  "mcpServers": {
+    "custom-server": {
+      "command": "node",
+      "args": ["server.js"],
+      "env": {
+        "API_KEY": "${API_KEY}"
+      }
+    }
+  }
+}
+```
+
+### 3. Skill-Embedded MCPs
+
+Managed by SkillMcpManager from SKILL.md YAML:
+
+```yaml
+mcp_servers:
+  - name: custom-mcp
+    command: node
+    args: [server.js]
+    env:
+      API_KEY: ${API_KEY}
+```
+
+## Examples
+
+### Complete Authentication Workflow
+
+```bash
+# 1. Check current status
+oh-my-opencode mcp oauth status
+
+# 2. Login to server
+oh-my-opencode mcp oauth login context7 \
+  --server-url https://auth.context7.com \
+  --scopes read write
+
+# 3. Verify authentication
+oh-my-opencode mcp oauth status context7
+
+# 4. Use authenticated server
+oh-my-opencode run "Search the codebase ultrawork"
+
+# 5. Logout when done
+oh-my-opencode mcp oauth logout context7
+```
+
+### Scripted Authentication
+
+```bash
+#!/bin/bash
+SERVER="my-mcp-server"
+URL="https://auth.example.com"
+
+# Check if already authenticated
+STATUS=$(oh-my-opencode mcp oauth status $SERVER 2>&1)
+
+if echo "$STATUS" | grep -q "Not authenticated"; then
+  echo "Authenticating with $SERVER..."
+  oh-my-opencode mcp oauth login $SERVER --server-url $URL
+else
+  echo "Already authenticated with $SERVER"
+fi
+```
+
+### CI/CD Token Management
+
+```yaml
+- name: Setup MCP OAuth
+  env:
+    MCP_TOKEN: ${{ secrets.MCP_TOKEN }}
+  run: |
+    mkdir -p ~/.config/opencode
+    echo '{"context7": {"access_token": "'$MCP_TOKEN'"}}' > \
+      ~/.config/opencode/mcp-oauth-tokens.json
+    chmod 600 ~/.config/opencode/mcp-oauth-tokens.json
+```
+
+## Troubleshooting
+
+### Browser Doesn't Open
+
+```
+Error: Failed to open browser for OAuth flow
+```
+
+**Solution**: Manually open the URL printed in terminal
+
+### Token Expired
+
+```
+❌ Token expired and refresh failed
+```
+
+**Solution**: Re-authenticate
+
+```bash
+oh-my-opencode mcp oauth logout context7
+oh-my-opencode mcp oauth login context7
+```
+
+### Invalid Client ID
+
+```
+Error: Invalid client_id
+```
+
+**Solution**: Use DCR or verify client ID
+
+```bash
+# Use DCR (no client-id)
+oh-my-opencode mcp oauth login context7 --server-url https://auth.context7.com
+```
+
+### Permission Denied
+
+```
+Error: EACCES: permission denied, open '~/.config/opencode/mcp-oauth-tokens.json'
+```
+
+**Solution**: Fix file permissions
+
+```bash
+chmod 600 ~/.config/opencode/mcp-oauth-tokens.json
+```
+
+## Security Best Practices
+
+1. **Never commit tokens** to version control
+2. **Use environment variables** for CI/CD
+3. **Rotate tokens regularly** by re-authenticating
+4. **Limit scopes** to minimum required permissions
+5. **Logout** from unused servers
+
+## Related
+
+- [Configuration Schema](/api/config/schema) - MCP configuration
+- [install](/api/cli/install) - Plugin installation
+
+## Source Code
+
+Implementation:
+- `src/cli/mcp-oauth/index.ts` - Command entry
+- `src/cli/mcp-oauth/login.ts` - OAuth login flow
+- `src/cli/mcp-oauth/logout.ts` - Token removal
+- `src/cli/mcp-oauth/status.ts` - Token status
+- `src/api/cli/mcp-oauth/` - OAuth PKCE implementation

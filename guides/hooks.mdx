@@ -1,0 +1,517 @@
+---
+title: Hooks
+description: Lifecycle hooks that intercept and modify agent behavior at key points
+---
+
+## What Are Hooks?
+
+Hooks intercept and modify behavior at key points in the agent lifecycle across the full session, message, tool, and parameter pipeline. They enable:
+
+- **Context injection:** Add relevant information automatically
+- **Behavior modification:** Change how agents respond to situations
+- **Quality checks:** Enforce standards and best practices
+- **Recovery mechanisms:** Handle errors and edge cases
+- **Notifications:** Alert users about important events
+
+## Hook Tiers
+
+Oh My OpenAgent organizes hooks into 5 tiers:
+
+### 1. Session Hooks (23 hooks)
+
+Manage session-level behavior, model selection, and lifecycle events.
+
+**Examples:** `context-window-monitor`, `think-mode`, `ralph-loop`, `model-fallback`, `runtime-fallback`, `no-sisyphus-gpt`, `anthropic-effort`
+
+### 2. Tool-Guard Hooks (10 hooks)
+
+Intercept tool execution to validate, enhance, or modify tool behavior.
+
+**Examples:** `comment-checker`, `rules-injector`, `write-existing-file-guard`, `json-error-recovery`, `hashline-read-enhancer`
+
+### 3. Transform Hooks (4 hooks)
+
+Transform messages and context during processing.
+
+**Examples:** `keyword-detector`, `thinking-block-validator`, `compaction-context-injector`
+
+### 4. Continuation Hooks (7 hooks)
+
+Manage multi-turn interactions and work continuation.
+
+**Examples:** `todo-continuation-enforcer`, `gpt-permission-continuation`, `atlas`, `stop-continuation-guard`
+
+### 5. Skill Hooks (2 hooks)
+
+Skill-related functionality and reminders.
+
+**Examples:** `category-skill-reminder`, `auto-slash-command`
+
+<Note>
+Total: **46 built-in hooks** across all tiers
+</Note>
+
+## Hook Events
+
+Hooks can intercept different events:
+
+| Event | When | Can |
+|-------|------|-----|
+| **PreToolUse** | Before tool execution | Block, modify input, inject context |
+| **PostToolUse** | After tool execution | Add warnings, modify output, inject messages |
+| **Message** | During message processing | Transform content, detect keywords, activate modes |
+| **Event** | On session lifecycle changes | Recovery, fallback, notifications |
+| **Transform** | During context transformation | Inject context, validate blocks |
+| **Params** | When setting API parameters | Adjust model settings, effort level |
+
+## Notable Built-in Hooks
+
+### Context & Injection
+
+#### directory-agents-injector
+
+**Event:** PreToolUse + PostToolUse
+
+**What it does:** Auto-injects AGENTS.md when reading files. Walks from file to project root, collecting all AGENTS.md files.
+
+<Info>
+Deprecated for OpenCode 1.1.37+ - Auto-disabled when native AGENTS.md injection is available.
+</Info>
+
+#### directory-readme-injector
+
+**Event:** PreToolUse + PostToolUse
+
+**What it does:** Auto-injects README.md for directory context.
+
+#### rules-injector
+
+**Event:** PreToolUse + PostToolUse
+
+**What it does:** Injects rules from `.claude/rules/` when conditions match. Supports globs and alwaysApply.
+
+**Example rule file:**
+
+```markdown
+---
+globs: ["*.ts", "src/**/*.js"]
+description: "TypeScript/JavaScript coding rules"
+---
+
+- Use PascalCase for interface names
+- Use camelCase for function names
+```
+
+#### compaction-context-injector
+
+**Event:** Event
+
+**What it does:** Preserves critical context during session compaction.
+
+### Productivity & Control
+
+#### keyword-detector
+
+**Event:** Message + Transform
+
+**What it does:** Detects keywords and activates modes:
+
+- `ultrawork`/`ulw`: Max performance mode
+- `search`/`find`: Parallel exploration
+- `analyze`/`investigate`: Deep analysis
+
+**Example:**
+
+```plaintext
+User: ultrawork on this feature
+(keyword-detector activates ultrawork mode)
+```
+
+#### think-mode
+
+**Event:** Params
+
+**What it does:** Auto-detects extended thinking needs. Catches "think deeply", "ultrathink" and adjusts model settings.
+
+#### ralph-loop
+
+**Event:** Event + Message
+
+**What it does:** Manages self-referential loop continuation for /ralph-loop and /ulw-loop commands.
+
+#### gpt-permission-continuation
+
+**Event:** Event
+
+**What it does:** Auto-continues GPT sessions when the final assistant reply ends with a permission-seeking tail such as "If you want, ...".
+
+<Warning>
+Disable this hook if you prefer GPT sessions to wait for explicit user follow-up instead of auto-resuming.
+</Warning>
+
+#### auto-slash-command
+
+**Event:** Message
+
+**What it does:** Automatically executes slash commands from prompts.
+
+### Quality & Safety
+
+#### comment-checker
+
+**Event:** PostToolUse
+
+**What it does:** Reminds agents to reduce excessive comments. Smartly ignores BDD, directives, docstrings.
+
+**Configure custom prompt:**
+
+```json
+{
+  "comment_checker": {
+    "custom_prompt": "Your message. Use {{comments}} placeholder."
+  }
+}
+```
+
+#### thinking-block-validator
+
+**Event:** Transform
+
+**What it does:** Validates thinking blocks to prevent API errors.
+
+#### write-existing-file-guard
+
+**Event:** PreToolUse
+
+**What it does:** Prevents accidental overwrites of existing files without reading them first.
+
+#### hashline-read-enhancer
+
+**Event:** PostToolUse
+
+**What it does:** Enhances read output with hash-anchored line markers for the hashline edit tool.
+
+<Info>
+Requires `hashline_edit: true` in config. Works with hashline-edit-diff-enhancer.
+</Info>
+
+### Recovery & Stability
+
+#### session-recovery
+
+**Event:** Event
+
+**What it does:** Recovers from session errors - missing tool results, thinking block issues, empty messages.
+
+#### anthropic-context-window-limit-recovery
+
+**Event:** Event
+
+**What it does:** Handles Claude context window limits gracefully.
+
+#### runtime-fallback
+
+**Event:** Event + Message
+
+**What it does:** Automatically switches to backup models on retryable API errors (e.g., 429, 503, 529), provider key misconfiguration errors, and auto-retry signals.
+
+**Configure:**
+
+```json
+{
+  "runtime_fallback": {
+    "enabled": true,
+    "retry_on_errors": [400, 429, 503, 529],
+    "max_fallback_attempts": 3,
+    "cooldown_seconds": 60,
+    "timeout_seconds": 30,
+    "notify_on_fallback": true
+  }
+}
+```
+
+#### edit-error-recovery
+
+**Event:** PostToolUse + Event
+
+**What it does:** Recovers from edit tool failures.
+
+### Truncation & Context Management
+
+#### tool-output-truncator
+
+**Event:** PostToolUse
+
+**What it does:** Truncates output from Grep, Glob, LSP, AST-grep tools. Dynamically adjusts based on context window.
+
+#### context-window-monitor
+
+**Event:** Event
+
+**What it does:** Monitors context window usage and tracks token consumption.
+
+#### preemptive-compaction
+
+**Event:** Event
+
+**What it does:** Proactively compacts sessions before hitting token limits.
+
+### Notifications & UX
+
+#### auto-update-checker
+
+**Event:** Event
+
+**What it does:** Checks for new versions on session creation, shows startup toast with version and Sisyphus status.
+
+<Info>
+Disable just the toast: Add `startup-toast` to `disabled_hooks`
+</Info>
+
+#### background-notification
+
+**Event:** Event
+
+**What it does:** Notifies when background agent tasks complete.
+
+#### session-notification
+
+**Event:** Event
+
+**What it does:** OS notifications when agents go idle. Works on macOS, Linux, Windows.
+
+**Force enable:**
+
+```json
+{
+  "notification": {
+    "force_enable": true
+  }
+}
+```
+
+#### agent-usage-reminder
+
+**Event:** PostToolUse + Event
+
+**What it does:** Reminds you to leverage specialized agents for better results.
+
+### Task Management
+
+#### task-resume-info
+
+**Event:** PostToolUse
+
+**What it does:** Provides task resume information for continuity.
+
+#### delegate-task-retry
+
+**Event:** PostToolUse + Event
+
+**What it does:** Retries failed task delegation calls.
+
+#### empty-task-response-detector
+
+**Event:** PostToolUse
+
+**What it does:** Detects empty responses from delegated tasks.
+
+#### tasks-todowrite-disabler
+
+**Event:** PreToolUse
+
+**What it does:** Disables TodoWrite tool when task system is active.
+
+### Continuation
+
+#### todo-continuation-enforcer
+
+**Event:** Event
+
+**What it does:** Enforces todo completion - yanks idle agents back to work.
+
+#### compaction-todo-preserver
+
+**Event:** Event
+
+**What it does:** Preserves todo state during session compaction.
+
+#### unstable-agent-babysitter
+
+**Event:** Event
+
+**What it does:** Handles unstable agent behavior with recovery strategies.
+
+### Integration
+
+#### claude-code-hooks
+
+**Event:** All
+
+**What it does:** Executes hooks from Claude Code's settings.json.
+
+**Example settings.json:**
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [{ "type": "command", "command": "eslint --fix $FILE" }]
+      }
+    ]
+  }
+}
+```
+
+**Hook locations:**
+- `~/.claude/settings.json` (user)
+- `./.claude/settings.json` (project)
+- `./.claude/settings.local.json` (local, git-ignored)
+
+#### atlas
+
+**Event:** Multiple
+
+**What it does:** Main orchestration logic for todo-driven work sessions.
+
+#### interactive-bash-session
+
+**Event:** PostToolUse + Event
+
+**What it does:** Manages tmux sessions for interactive CLI.
+
+### Specialized
+
+#### prometheus-md-only
+
+**Event:** PreToolUse
+
+**What it does:** Enforces markdown-only output for Prometheus planner.
+
+#### no-sisyphus-gpt
+
+**Event:** Message
+
+**What it does:** Prevents Sisyphus from running on incompatible GPT models. Allows only GPT-5.4 with dedicated prompt path.
+
+<Warning>
+**DO NOT DISABLE** this hook. It prevents incompatible model/agent combinations.
+</Warning>
+
+#### no-hephaestus-non-gpt
+
+**Event:** Message
+
+**What it does:** Prevents Hephaestus from running on non-GPT models. Built for Codex's autonomous style.
+
+#### sisyphus-junior-notepad
+
+**Event:** PreToolUse
+
+**What it does:** Manages notepad state for Sisyphus-Junior agents.
+
+## Disabling Hooks
+
+### Disable Specific Hooks
+
+```json
+{
+  "disabled_hooks": ["comment-checker", "gpt-permission-continuation"]
+}
+```
+
+### Common Disable Scenarios
+
+**Disable continuation:**
+
+```json
+{
+  "disabled_hooks": [
+    "gpt-permission-continuation",
+    "todo-continuation-enforcer"
+  ]
+}
+```
+
+**Disable notifications:**
+
+```json
+{
+  "disabled_hooks": [
+    "background-notification",
+    "session-notification",
+    "auto-update-checker",
+    "startup-toast"
+  ]
+}
+```
+
+**Disable context injection:**
+
+```json
+{
+  "disabled_hooks": [
+    "directory-agents-injector",
+    "directory-readme-injector",
+    "rules-injector"
+  ]
+}
+```
+
+## Available Hooks Reference
+
+Complete list of all 46 hooks:
+
+- `gpt-permission-continuation`
+- `todo-continuation-enforcer`
+- `context-window-monitor`
+- `session-recovery`
+- `session-notification`
+- `comment-checker`
+- `grep-output-truncator`
+- `tool-output-truncator`
+- `directory-agents-injector`
+- `directory-readme-injector`
+- `empty-task-response-detector`
+- `think-mode`
+- `anthropic-context-window-limit-recovery`
+- `rules-injector`
+- `background-notification`
+- `auto-update-checker`
+- `startup-toast`
+- `keyword-detector`
+- `agent-usage-reminder`
+- `non-interactive-env`
+- `interactive-bash-session`
+- `compaction-context-injector`
+- `thinking-block-validator`
+- `claude-code-hooks`
+- `ralph-loop`
+- `preemptive-compaction`
+- `auto-slash-command`
+- `sisyphus-junior-notepad`
+- `no-sisyphus-gpt`
+- `no-hephaestus-non-gpt`
+- `start-work`
+- `runtime-fallback`
+- `model-fallback`
+- `edit-error-recovery`
+- `write-existing-file-guard`
+- `hashline-read-enhancer`
+- `hashline-edit-diff-enhancer`
+- `json-error-recovery`
+- `task-resume-info`
+- `delegate-task-retry`
+- `tasks-todowrite-disabler`
+- `compaction-todo-preserver`
+- `unstable-agent-babysitter`
+- `atlas`
+- `category-skill-reminder`
+- `stop-continuation-guard`
+- `prometheus-md-only`
+
+<Info>
+Some hooks are auto-disabled based on OpenCode version or configuration. For example, `directory-agents-injector` is disabled on OpenCode 1.1.37+ when native AGENTS.md support is available.
+</Info>

@@ -1,0 +1,432 @@
+---
+title: "oh-my-opencode run"
+description: "Non-interactive session launcher with todo and background task completion enforcement"
+---
+
+## Overview
+
+The `run` command launches non-interactive OpenCode sessions with automatic completion detection. Unlike `opencode run`, it waits until all todos are completed and all background tasks are idle before exiting.
+
+## Command Syntax
+
+```bash
+oh-my-opencode run <message> [options]
+```
+
+## Arguments
+
+<ParamField path="message" type="string" required>
+  The prompt message for the agent
+  
+  ```bash
+  oh-my-opencode run "Fix the bug in index.ts"
+  ```
+</ParamField>
+
+## Options
+
+<ParamField path="-a, --agent" type="string">
+  Agent to use for this session
+  
+  Default: Resolved from CLI flag → env → config → Sisyphus
+  
+  ```bash
+  oh-my-opencode run --agent Sisyphus "Implement feature X"
+  ```
+</ParamField>
+
+<ParamField path="-m, --model" type="string">
+  Model override in `provider/model` format
+  
+  Overrides agent and category model settings
+  
+  ```bash
+  oh-my-opencode run --model anthropic/claude-sonnet-4 "Fix the bug"
+  ```
+</ParamField>
+
+<ParamField path="-d, --directory" type="string">
+  Working directory for the session
+  
+  Default: Current directory
+  
+  ```bash
+  oh-my-opencode run --directory /path/to/project "Run tests"
+  ```
+</ParamField>
+
+<ParamField path="-p, --port" type="number">
+  Server port (attaches if port already in use)
+  
+  Starts new OpenCode server if not running
+  
+  ```bash
+  oh-my-opencode run --port 4321 "Fix the bug"
+  ```
+</ParamField>
+
+<ParamField path="--attach" type="string">
+  Attach to existing OpenCode server URL
+  
+  Mutually exclusive with `--port`
+  
+  ```bash
+  oh-my-opencode run --attach http://127.0.0.1:4321 "Fix the bug"
+  ```
+</ParamField>
+
+<ParamField path="--on-complete" type="string">
+  Shell command to run after completion
+  
+  Executed after session exits successfully
+  
+  ```bash
+  oh-my-opencode run --on-complete "notify-send Done" "Fix the bug"
+  ```
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Output structured JSON result to stdout
+  
+  Useful for scripting and automation
+  
+  ```bash
+  oh-my-opencode run --json "Fix the bug" | jq .sessionId
+  ```
+</ParamField>
+
+<ParamField path="--no-timestamp" type="flag">
+  Disable timestamp prefix in run output
+  
+  ```bash
+  oh-my-opencode run --no-timestamp "Fix the bug"
+  ```
+</ParamField>
+
+<ParamField path="--verbose" type="flag">
+  Show full event stream (default: messages/tools only)
+  
+  ```bash
+  oh-my-opencode run --verbose "Fix the bug"
+  ```
+</ParamField>
+
+<ParamField path="--session-id" type="string">
+  Resume existing session instead of creating new one
+  
+  ```bash
+  oh-my-opencode run --session-id ses_abc123 "Continue the work"
+  ```
+</ParamField>
+
+## Examples
+
+### Basic Usage
+
+```bash
+oh-my-opencode run "Fix the bug in index.ts"
+```
+
+Creates new session, runs Sisyphus (or configured default agent), waits for completion.
+
+### With Agent Override
+
+```bash
+oh-my-opencode run --agent Hephaestus "Refactor the code"
+```
+
+### With Model Override
+
+```bash
+oh-my-opencode run --model anthropic/claude-opus-4-5 "Complex refactoring"
+```
+
+Overrides agent/category model settings for this session only.
+
+### Combined Agent and Model
+
+```bash
+oh-my-opencode run --agent Sisyphus --model openai/gpt-5.4 "Implement feature X"
+```
+
+### Attach to Running Server
+
+```bash
+oh-my-opencode run --port 4321 "Fix the bug"
+```
+
+Or attach to existing server:
+
+```bash
+oh-my-opencode run --attach http://127.0.0.1:4321 "Fix the bug"
+```
+
+### JSON Output for Scripting
+
+```bash
+oh-my-opencode run --json "Fix the bug" | jq '.sessionId'
+```
+
+Output:
+```json
+{
+  "sessionId": "ses_abc123",
+  "success": true,
+  "durationMs": 45000,
+  "messageCount": 12,
+  "summary": "Fixed bug in index.ts"
+}
+```
+
+### With Completion Hook
+
+```bash
+oh-my-opencode run --on-complete "notify-send 'Task completed'" "Fix the bug"
+```
+
+Runs shell command after session completes successfully.
+
+### Resume Existing Session
+
+```bash
+oh-my-opencode run --session-id ses_abc123 "Continue the work"
+```
+
+### Custom Working Directory
+
+```bash
+oh-my-opencode run --directory /path/to/project "Run the build"
+```
+
+## Agent Resolution Priority
+
+Agents are resolved in this order:
+
+1. **`--agent` CLI flag**
+2. **`OPENCODE_DEFAULT_AGENT` environment variable**
+3. **`default_run_agent` in config** (`~/.config/opencode/oh-my-opencode.jsonc`)
+4. **Sisyphus** (fallback)
+
+```bash
+# CLI flag (highest priority)
+oh-my-opencode run --agent Hephaestus "Fix bug"
+
+# Environment variable
+export OPENCODE_DEFAULT_AGENT=Prometheus
+oh-my-opencode run "Fix bug"
+
+# Config file
+# ~/.config/opencode/oh-my-opencode.jsonc
+{
+  "default_run_agent": "Atlas"
+}
+oh-my-opencode run "Fix bug"
+
+# Fallback to Sisyphus if none specified
+oh-my-opencode run "Fix bug"
+```
+
+## Disabled Agent Handling
+
+If requested agent is disabled:
+
+```bash
+oh-my-opencode run --agent Oracle "Research the API"
+```
+
+Output:
+```
+Requested agent "Oracle" is disabled. Falling back to "Sisyphus".
+```
+
+Falls back through core agents in order:
+1. Sisyphus
+2. Hephaestus
+3. Prometheus
+4. Atlas
+
+## Completion Detection
+
+Unlike `opencode run`, this command waits until:
+
+1. **All todos are completed or cancelled**
+   - No pending or in_progress todos
+   - TodoWrite/TodoRead track task state
+
+2. **All child sessions (background tasks) are idle**
+   - No running background agents
+   - Background task limit: 5 concurrent per model/provider
+
+```bash
+oh-my-opencode run "Fix all bugs ultrawork"
+# Waits for:
+# - Main session todos: completed
+# - Background task sessions: idle
+# - Then exits with code 0
+```
+
+## Exit Codes
+
+- **0**: Success (all tasks completed)
+- **1**: Error (connection failed, invalid config, etc.)
+- **130**: Interrupted (SIGINT/Ctrl+C)
+
+## Output Formats
+
+### Standard Output
+
+```bash
+oh-my-opencode run "Fix the bug"
+```
+
+Output:
+```
+Session: ses_abc123
+Model: anthropic/claude-opus-4-5
+[13:45:01] Sisyphus: Analyzing the bug in index.ts...
+[13:45:15] Sisyphus: Found issue on line 42
+[13:45:30] Sisyphus: Applied fix and ran tests
+```
+
+### JSON Output
+
+```bash
+oh-my-opencode run --json "Fix the bug"
+```
+
+Output:
+```json
+{
+  "sessionId": "ses_abc123",
+  "success": true,
+  "durationMs": 45000,
+  "messageCount": 12,
+  "summary": "Fixed bug in index.ts by correcting async handling"
+}
+```
+
+## Environment Variables
+
+<ParamField path="OPENCODE_DEFAULT_AGENT" type="string">
+  Default agent for run command
+  
+  ```bash
+  export OPENCODE_DEFAULT_AGENT=Hephaestus
+  oh-my-opencode run "Fix bug"
+  ```
+</ParamField>
+
+<ParamField path="OPENCODE_CLI_RUN_MODE" type="string">
+  Set to `"true"` automatically by run command
+  
+  Used internally to detect CLI run mode
+</ParamField>
+
+## Advanced Usage
+
+### Scripting with JSON Output
+
+```bash
+#!/bin/bash
+RESULT=$(oh-my-opencode run --json "Fix the bug")
+SESSION_ID=$(echo $RESULT | jq -r '.sessionId')
+SUCCESS=$(echo $RESULT | jq -r '.success')
+
+if [ "$SUCCESS" = "true" ]; then
+  echo "Session $SESSION_ID completed successfully"
+else
+  echo "Session $SESSION_ID failed"
+  exit 1
+fi
+```
+
+### CI/CD Integration
+
+```yaml
+- name: Run OpenCode Agent
+  run: |
+    oh-my-opencode run \
+      --json \
+      --agent Hephaestus \
+      --on-complete "echo 'Done'" \
+      "Run the test suite" > result.json
+    
+- name: Check Results
+  run: |
+    if [ $(jq -r '.success' result.json) = "true" ]; then
+      echo "Tests passed"
+    else
+      exit 1
+    fi
+```
+
+### Parallel Sessions
+
+```bash
+oh-my-opencode run --port 4321 "Fix bug A" &
+oh-my-opencode run --port 4322 "Fix bug B" &
+wait
+```
+
+## Comparison with `opencode run`
+
+| Feature | `opencode run` | `oh-my-opencode run` |
+|---------|----------------|---------------------|
+| Completion detection | Manual | Automatic (todos + background tasks) |
+| Agent selection | Manual | CLI flag → env → config → fallback |
+| JSON output | No | Yes (`--json`) |
+| Completion hooks | No | Yes (`--on-complete`) |
+| Model override | Yes | Yes (`--model`) |
+| Session resume | Yes | Yes (`--session-id`) |
+
+## Troubleshooting
+
+### Session Doesn't Complete
+
+Check for pending todos:
+
+```bash
+oh-my-opencode run --verbose "Fix the bug"
+```
+
+Look for:
+- Uncompleted TodoWrite tasks
+- Running background tasks
+- Idle timeouts
+
+### Agent Not Found
+
+```
+Error: Agent "MyAgent" not found
+```
+
+Solution: Use valid agent name or check spelling
+
+```bash
+oh-my-opencode run --agent Sisyphus "Fix bug"
+```
+
+### Port Already in Use
+
+```
+Error: Port 4321 already in use
+```
+
+Solution: Attach to existing server or use different port
+
+```bash
+oh-my-opencode run --attach http://127.0.0.1:4321 "Fix bug"
+```
+
+## Related Commands
+
+- [install](/api/cli/install) - Install and configure plugin
+- [doctor](/api/cli/doctor) - Health diagnostics
+
+## Source Code
+
+Implementation:
+- `src/cli/run/runner.ts` - Main orchestration
+- `src/cli/run/agent-resolver.ts` - Agent resolution logic
+- `src/cli/run/poll-for-completion.ts` - Completion detection
+- `src/cli/run/events.ts` - Event stream processing

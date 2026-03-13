@@ -1,0 +1,742 @@
+---
+title: Doctor Checks
+description: Health diagnostics with oh-my-opencode doctor command
+---
+
+## Overview
+
+The `oh-my-opencode doctor` command runs **automated health checks** across four categories:
+
+- **System**: Binary, plugin registration, version compatibility
+- **Config**: JSONC validity, schema validation
+- **Tools**: AST-Grep, LSP, GitHub CLI, MCP servers
+- **Models**: Cache, resolution, agent/category overrides
+
+<Info>
+  Doctor checks run in parallel for fast diagnostics. Use `--mode=verbose` for detailed output or `--format=json` for machine-readable results.
+</Info>
+
+## Usage
+
+```bash
+# Default mode: concise status
+oh-my-opencode doctor
+
+# Verbose mode: detailed diagnostics
+oh-my-opencode doctor --mode=verbose
+
+# Status-only mode: pass/fail indicators
+oh-my-opencode doctor --mode=status
+
+# JSON output: for scripting
+oh-my-opencode doctor --format=json
+```
+
+<CodeGroup>
+```bash Default
+oh-my-opencode doctor
+```
+
+```bash Verbose
+oh-my-opencode doctor --mode=verbose
+```
+
+```bash JSON
+oh-my-opencode doctor --format=json > doctor-report.json
+```
+</CodeGroup>
+
+## Check Categories
+
+### System Checks
+
+Verifies core requirements and installation integrity.
+
+<AccordionGroup>
+  <Accordion title="Binary Found">
+    **What it checks:**
+    - OpenCode binary exists in PATH
+    - Binary is executable
+    
+    **Why it matters:**
+    Plugin requires OpenCode to be installed and accessible.
+    
+    **Fix if failed:**
+    ```bash
+    # Check if opencode is in PATH
+    which opencode
+    
+    # If not found, install OpenCode
+    npm install -g @opencode-ai/cli
+    ```
+  </Accordion>
+  
+  <Accordion title="Version Check">
+    **What it checks:**
+    - OpenCode version >= 1.0.150
+    
+    **Why it matters:**
+    Oh-My-OpenCode requires OpenCode 1.0.150+ for plugin system compatibility.
+    
+    **Fix if failed:**
+    ```bash
+    # Update OpenCode
+    npm install -g @opencode-ai/cli@latest
+    
+    # Verify version
+    opencode --version
+    ```
+  </Accordion>
+  
+  <Accordion title="Plugin Registered">
+    **What it checks:**
+    - `oh-my-opencode` in OpenCode config plugin array
+    
+    **Why it matters:**
+    Without registration, OpenCode won't load the plugin.
+    
+    **Fix if failed:**
+    ```bash
+    # Run installer to register
+    oh-my-opencode install
+    
+    # Or manually edit ~/.config/opencode/opencode.json:
+    {
+      "plugin": ["oh-my-opencode"]
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Version Match">
+    **What it checks:**
+    - Installed plugin version matches loaded version
+    
+    **Why it matters:**
+    Mismatches indicate stale cache or multiple installations.
+    
+    **Fix if failed:**
+    ```bash
+    # Reinstall plugin
+    npm install -g oh-my-opencode@latest
+    
+    # Clear OpenCode cache
+    rm -rf ~/.cache/opencode/plugins
+    
+    # Restart OpenCode
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Config Checks
+
+Validates configuration file syntax and schema.
+
+<AccordionGroup>
+  <Accordion title="JSONC Validity">
+    **What it checks:**
+    - Project config (`.opencode/oh-my-opencode.jsonc`)
+    - User config (`~/.config/opencode/oh-my-opencode.jsonc`)
+    - Syntax: valid JSON/JSONC (comments, trailing commas allowed)
+    
+    **Why it matters:**
+    Invalid JSON breaks config loading.
+    
+    **Fix if failed:**
+    ```bash
+    # Validate JSON syntax
+    cat .opencode/oh-my-opencode.jsonc | jq .
+    
+    # Common errors:
+    # - Missing closing brace/bracket
+    # - Unquoted keys
+    # - Invalid escape sequences
+    ```
+  </Accordion>
+  
+  <Accordion title="Schema Validation">
+    **What it checks:**
+    - Config structure matches Zod v4 schema
+    - Field names correct (e.g., `model` not `modelId`)
+    - Types correct (e.g., `temperature` is number, not string)
+    
+    **Why it matters:**
+    Invalid schema causes config merge failures.
+    
+    **Fix if failed:**
+    ```bash
+    # Doctor verbose mode shows exact error
+    oh-my-opencode doctor --mode=verbose
+    
+    # Common mistakes:
+    # - Wrong field: "modelId" → "model"
+    # - Wrong type: "temperature": "0.5" → "temperature": 0.5
+    # - Missing required: "model" field in agent override
+    ```
+  </Accordion>
+  
+  <Accordion title="Model Override Syntax">
+    **What it checks:**
+    - Agent model overrides use `provider/model-id` format
+    - Category model overrides use same format
+    
+    **Why it matters:**
+    Incorrect format breaks model resolution.
+    
+    **Fix if failed:**
+    ```json
+    // ❌ Wrong
+    {
+      "agents": {
+        "sisyphus": {
+          "model": "claude-opus-4-6"  // Missing provider
+        }
+      }
+    }
+    
+    // ✅ Correct
+    {
+      "agents": {
+        "sisyphus": {
+          "model": "anthropic/claude-opus-4-6"
+        }
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Tool Checks
+
+Verifies external tool availability and functionality.
+
+<AccordionGroup>
+  <Accordion title="AST-Grep">
+    **What it checks:**
+    - `ast-grep` binary in PATH
+    - Version compatible with plugin
+    
+    **Why it matters:**
+    `ast_grep_search` and `ast_grep_replace` tools require ast-grep CLI.
+    
+    **Fix if failed:**
+    ```bash
+    # Install via cargo
+    cargo install ast-grep
+    
+    # Or via homebrew (macOS)
+    brew install ast-grep
+    
+    # Verify
+    ast-grep --version
+    ```
+  </Accordion>
+  
+  <Accordion title="Comment Checker CLI">
+    **What it checks:**
+    - Bundled CLI binary downloaded
+    - Binary is executable
+    
+    **Why it matters:**
+    Comment checker hook requires this CLI for pattern detection.
+    
+    **Fix if failed:**
+    ```bash
+    # CLI downloads automatically on first use
+    # If download fails, check:
+    
+    # 1. Internet connection
+    # 2. ~/.cache/oh-my-opencode/ writable
+    # 3. Firewall not blocking download
+    
+    # Manual download (if needed):
+    mkdir -p ~/.cache/oh-my-opencode
+    # Download from releases page and place in cache dir
+    ```
+  </Accordion>
+  
+  <Accordion title="LSP Servers">
+    **What it checks:**
+    - Language servers available for project
+    - TypeScript: `typescript-language-server`
+    - Python: `python-lsp-server` or `pyright`
+    
+    **Why it matters:**
+    LSP tools (`lsp_diagnostics`, `lsp_rename`, etc.) require language servers.
+    
+    **Fix if failed:**
+    ```bash
+    # TypeScript
+    npm install -g typescript-language-server typescript
+    
+    # Python
+    pip install python-lsp-server
+    # or
+    pip install pyright
+    
+    # Go
+    go install golang.org/x/tools/gopls@latest
+    ```
+  </Accordion>
+  
+  <Accordion title="GitHub CLI">
+    **What it checks:**
+    - `gh` binary in PATH
+    - Authenticated with GitHub
+    
+    **Why it matters:**
+    Git-master skill and GitHub integration require gh CLI.
+    
+    **Fix if failed:**
+    ```bash
+    # Install GitHub CLI
+    brew install gh  # macOS
+    sudo apt install gh  # Ubuntu/Debian
+    
+    # Authenticate
+    gh auth login
+    
+    # Verify
+    gh auth status
+    ```
+  </Accordion>
+  
+  <Accordion title="MCP Servers">
+    **What it checks:**
+    - Built-in MCPs: websearch, context7, grep_app
+    - Skill-embedded MCPs from loaded skills
+    - OAuth-protected MCPs have valid tokens
+    
+    **Why it matters:**
+    MCP tools fail if servers aren't accessible.
+    
+    **Fix if failed:**
+    ```bash
+    # Check MCP config
+    cat ~/.config/opencode/.mcp.json
+    
+    # For OAuth MCPs
+    oh-my-opencode mcp oauth status <server-name>
+    oh-my-opencode mcp oauth login <server-name> --server-url <url>
+    
+    # For skill MCPs, verify skill is loaded
+    # (check doctor verbose output for skill list)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Model Resolution Checks
+
+Validates model configuration and availability.
+
+<AccordionGroup>
+  <Accordion title="Model Cache">
+    **What it checks:**
+    - Model cache file exists
+    - Cache is not corrupted
+    
+    **Why it matters:**
+    Cache speeds up model resolution.
+    
+    **Fix if failed:**
+    ```bash
+    # Cache regenerates automatically
+    # If issues persist, clear cache:
+    rm -rf ~/.cache/oh-my-opencode/models
+    ```
+  </Accordion>
+  
+  <Accordion title="Model Resolution">
+    **What it checks:**
+    - All agents resolve to a valid model
+    - All categories resolve to a valid model
+    
+    **Why it matters:**
+    Unresolved models cause agent failures.
+    
+    **Fix if failed:**
+    ```bash
+    # Doctor verbose shows which agent/category failed
+    oh-my-opencode doctor --mode=verbose
+    
+    # Common cause: missing API key for provider
+    # Check environment:
+    echo $ANTHROPIC_API_KEY
+    echo $OPENAI_API_KEY
+    echo $GOOGLE_API_KEY
+    ```
+  </Accordion>
+  
+  <Accordion title="Agent Overrides">
+    **What it checks:**
+    - Agent model overrides are valid
+    - Overridden models exist and are accessible
+    
+    **Why it matters:**
+    Invalid overrides fall back to default (may be unexpected).
+    
+    **Fix if failed:**
+    ```bash
+    # Check override syntax
+    cat .opencode/oh-my-opencode.json
+    
+    # Ensure format: "provider/model-id"
+    {
+      "agents": {
+        "sisyphus": {
+          "model": "anthropic/claude-opus-4-6"  // ✅
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Category Overrides">
+    **What it checks:**
+    - Category model overrides are valid
+    - Categories with overrides resolve correctly
+    
+    **Why it matters:**
+    Task delegation depends on category model resolution.
+    
+    **Fix if failed:**
+    ```bash
+    # Same as agent overrides
+    # Check category config in oh-my-opencode.json
+    {
+      "categories": {
+        "visual-engineering": {
+          "model": "google/gemini-3.1-pro"  // ✅
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Model Availability">
+    **What it checks:**
+    - Configured models are accessible via provider APIs
+    - API keys have necessary permissions
+    
+    **Why it matters:**
+    Inaccessible models cause runtime errors.
+    
+    **Fix if failed:**
+    ```bash
+    # Test provider access directly
+    
+    # Anthropic
+    curl https://api.anthropic.com/v1/messages \
+      -H "x-api-key: $ANTHROPIC_API_KEY" \
+      -H "anthropic-version: 2023-06-01" \
+      -d '{"model":"claude-3-haiku-20240307","max_tokens":10,"messages":[{"role":"user","content":"test"}]}'
+    
+    # OpenAI
+    curl https://api.openai.com/v1/models \
+      -H "Authorization: Bearer $OPENAI_API_KEY"
+    
+    # If access fails, regenerate API key from provider dashboard
+    ```
+  </Accordion>
+  
+  <Accordion title="Variant Support">
+    **What it checks:**
+    - Model variants (max, xhigh, high, medium, low) are valid
+    - Provider supports requested variant
+    
+    **Why it matters:**
+    Invalid variants fall back to default.
+    
+    **Fix if failed:**
+    ```bash
+    # Check variant in config
+    {
+      "agents": {
+        "prometheus": {
+          "model": "anthropic/claude-opus-4-6",
+          "variant": "max"  // Valid for Anthropic
+        }
+      }
+    }
+    
+    # Valid variants by provider:
+    # - Anthropic: max
+    # - OpenAI: xhigh, high, medium, low
+    # - Others: (none)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Output Formats
+
+### Default Mode
+
+Concise summary with critical issues highlighted:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Oh-My-OpenCode Doctor
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ System
+   Binary: found (v1.0.152)
+   Plugin: registered
+   Version: match (0.41.0)
+
+✅ Config
+   Syntax: valid
+   Schema: valid
+
+⚠️  Tools
+   AST-Grep: not found
+   LSP: typescript-language-server found
+   GitHub CLI: found (v2.40.0)
+
+✅ Models
+   Agents: 11/11 resolved
+   Categories: 8/8 resolved
+
+Status: 3/4 passed (1 warning)
+```
+
+### Verbose Mode
+
+Detailed diagnostics with specific values:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Oh-My-OpenCode Doctor (Verbose)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[System]
+✅ Binary Found
+   Path: /usr/local/bin/opencode
+   Version: 1.0.152
+
+✅ Plugin Registered
+   Config: ~/.config/opencode/opencode.json
+   Plugins: ["oh-my-opencode"]
+
+✅ Version Match
+   Installed: 0.41.0
+   Loaded: 0.41.0
+
+[Config]
+✅ User Config
+   Path: ~/.config/opencode/oh-my-opencode.jsonc
+   Syntax: valid
+   Schema: valid
+
+✅ Project Config
+   Path: .opencode/oh-my-opencode.json
+   Syntax: valid
+   Schema: valid
+
+[Tools]
+❌ AST-Grep
+   Status: not found
+   Fix: cargo install ast-grep
+
+✅ LSP Servers
+   TypeScript: typescript-language-server (v4.3.2)
+   Python: python-lsp-server (v1.7.1)
+
+✅ GitHub CLI
+   Version: 2.40.0
+   Auth: github.com (logged in)
+
+[Models]
+✅ Model Cache
+   Path: ~/.cache/oh-my-opencode/models/cache.json
+   Entries: 47
+
+✅ Agent Resolution
+   sisyphus: anthropic/claude-opus-4-6 (override)
+   hephaestus: openai/gpt-5.3-codex
+   oracle: openai/gpt-5.4
+   librarian: google/gemini-3-flash
+   ...
+
+✅ Category Resolution
+   visual-engineering: google/gemini-3.1-pro
+   ultrabrain: openai/gpt-5.4 (xhigh)
+   deep: openai/gpt-5.3-codex (medium)
+   ...
+
+Status: 3/4 passed (1 failure)
+```
+
+### Status Mode
+
+Minimal pass/fail indicators:
+
+```
+[System]    ✅
+[Config]    ✅
+[Tools]     ❌
+[Models]    ✅
+
+Status: 3/4
+```
+
+### JSON Format
+
+Machine-readable output for scripting:
+
+```json
+{
+  "version": "0.41.0",
+  "timestamp": "2026-03-13T10:30:00Z",
+  "checks": {
+    "system": {
+      "status": "pass",
+      "binary": {
+        "found": true,
+        "path": "/usr/local/bin/opencode",
+        "version": "1.0.152"
+      },
+      "plugin": {
+        "registered": true
+      },
+      "version": {
+        "match": true,
+        "installed": "0.41.0",
+        "loaded": "0.41.0"
+      }
+    },
+    "config": {
+      "status": "pass",
+      "user": {
+        "valid": true,
+        "path": "~/.config/opencode/oh-my-opencode.jsonc"
+      },
+      "project": {
+        "valid": true,
+        "path": ".opencode/oh-my-opencode.json"
+      }
+    },
+    "tools": {
+      "status": "fail",
+      "ast_grep": {
+        "found": false
+      },
+      "lsp": {
+        "typescript": {
+          "found": true,
+          "version": "4.3.2"
+        }
+      },
+      "gh": {
+        "found": true,
+        "version": "2.40.0"
+      }
+    },
+    "models": {
+      "status": "pass",
+      "agents": {
+        "resolved": 11,
+        "total": 11
+      },
+      "categories": {
+        "resolved": 8,
+        "total": 8
+      }
+    }
+  },
+  "summary": {
+    "passed": 3,
+    "failed": 1,
+    "total": 4
+  }
+}
+```
+
+## Exit Codes
+
+| Code | Meaning |
+|------|----------|
+| `0` | All checks passed |
+| `1` | One or more checks failed |
+| `2` | Critical system check failed (e.g., OpenCode not installed) |
+
+<Tip>
+  Use exit codes in CI/CD pipelines to verify installation health:
+  
+  ```bash
+  oh-my-opencode doctor --mode=status
+  if [ $? -ne 0 ]; then
+    echo "Doctor checks failed"
+    exit 1
+  fi
+  ```
+</Tip>
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+name: Oh-My-OpenCode Health Check
+
+on: [push, pull_request]
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      
+      - name: Install dependencies
+        run: |
+          npm install -g @opencode-ai/cli
+          npm install -g oh-my-opencode
+      
+      - name: Run doctor checks
+        run: oh-my-opencode doctor --format=json > doctor-report.json
+      
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: doctor-report
+          path: doctor-report.json
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Run doctor after installation">
+    Always verify installation with doctor:
+    
+    ```bash
+    oh-my-opencode install
+    oh-my-opencode doctor --mode=verbose
+    ```
+  </Accordion>
+  
+  <Accordion title="Use verbose mode for debugging">
+    When troubleshooting, verbose mode shows exact values:
+    
+    ```bash
+    oh-my-opencode doctor --mode=verbose | tee doctor-log.txt
+    ```
+  </Accordion>
+  
+  <Accordion title="Check doctor before reporting issues">
+    Include doctor output when filing bug reports:
+    
+    ```bash
+    oh-my-opencode doctor --mode=verbose > doctor-output.txt
+    # Attach doctor-output.txt to issue
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+- [Common Issues](/troubleshooting/common-issues) - Solutions for frequent problems
+- [Installation Guide](/installation) - Setup instructions
+- [Configuration Reference](/guides/configuration) - Config options

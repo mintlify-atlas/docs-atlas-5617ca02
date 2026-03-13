@@ -1,0 +1,317 @@
+---
+title: Librarian Agent
+description: External documentation and open-source codebase search specialist
+---
+
+## Overview
+
+The Librarian is a specialized agent for searching and understanding external documentation, open-source codebases, and library implementations. It uses GitHub CLI, Context7, and Web Search to find authoritative information about external dependencies.
+
+**Philosophy**: Find EVIDENCE with GitHub permalinks, not opinions.
+
+## Key Characteristics
+
+- **Mode**: `subagent` (invoked by other agents)
+- **Temperature**: `0.1`
+- **Default Model**: `gemini-3-flash`
+- **Cost**: CHEAP
+
+## Core Competencies
+
+- Multi-repository analysis and search
+- Official documentation retrieval
+- Finding implementation examples in open source
+- GitHub code search with permalinks
+- Library internals explanation
+- Best practices discovery
+
+## Model Fallback Chain
+
+1. **minimax-m2.5** - OpenCode Go
+2. **minimax-m2.5-free** - OpenCode
+3. **claude-haiku-4-5** - Anthropic, OpenCode
+4. **gpt-5-nano** - OpenCode
+
+## Tool Restrictions
+
+**Read-only external search agent**:
+
+- **Allowed**: `read`, `bash` (gh, git), `grep`, `glob`, `webfetch`, `websearch_*`, `context7_*`, `grep_app_*`
+- **Denied**: `write`, `edit`, `apply_patch`, `task`, `call_omo_agent`
+
+## Configuration
+
+### Basic Configuration
+
+```json
+{
+  "agents": {
+    "librarian": {
+      "model": "gemini-3-flash"
+    }
+  }
+}
+```
+
+### Configuration Options
+
+<ParamField path="agents.librarian.model" type="string">
+  Model to use for Librarian. Overrides the fallback chain.
+</ParamField>
+
+<ParamField path="agents.librarian.temperature" type="number" default="0.1">
+  Temperature for response generation (0.0-1.0)
+</ParamField>
+
+## Request Classification
+
+Librarian classifies EVERY request before taking action:
+
+### Type A: Conceptual
+
+**Trigger**: "How do I use X?", "Best practice for Y?", "What is Z?"
+
+**Strategy**: Documentation Discovery → context7 + websearch
+
+**Example**: "How do I use React hooks?"
+
+### Type B: Implementation
+
+**Trigger**: "How does X implement Y?", "Show me source of Z"
+
+**Strategy**: `gh clone` + read + blame
+
+**Example**: "How does Express implement middleware chaining?"
+
+### Type C: Context & History
+
+**Trigger**: "Why was this changed?", "History of X?", "Related issues/PRs?"
+
+**Strategy**: `gh search issues/prs` + `git log/blame`
+
+**Example**: "Why did React remove lifecycle methods?"
+
+### Type D: Comprehensive
+
+**Trigger**: Complex questions, ambiguous requests, "deep dive into..."
+
+**Strategy**: Documentation Discovery → ALL tools in parallel
+
+**Example**: "Explain React's reconciliation algorithm in detail"
+
+## Documentation Discovery Phase
+
+**For Type A & D requests**, Librarian executes documentation discovery FIRST:
+
+### Step 1: Find Official Documentation
+
+```bash
+websearch("library-name official documentation site")
+```
+
+- Identify official documentation URL
+- Note the base URL (e.g., `https://docs.example.com`)
+
+### Step 2: Version Check
+
+If user mentions specific version:
+
+```bash
+websearch("library-name v{version} documentation")
+webfetch(official_docs_url + "/v{version}")
+```
+
+- Confirm correct version's documentation
+- Many docs have versioned URLs: `/docs/v2/`, `/v14/`, etc.
+
+### Step 3: Sitemap Discovery
+
+```bash
+webfetch(official_docs_base_url + "/sitemap.xml")
+# Fallbacks:
+webfetch(official_docs_base_url + "/sitemap-0.xml")
+webfetch(official_docs_base_url + "/docs/sitemap.xml")
+```
+
+- Parse sitemap to understand doc structure
+- Identify relevant sections for the query
+- Prevents random searching - know WHERE to look
+
+### Step 4: Targeted Investigation
+
+```bash
+webfetch(specific_doc_page_from_sitemap)
+context7_query-docs(libraryId: id, query: "specific topic")
+```
+
+## Parallel Execution Requirements
+
+| Request Type | Minimum Calls | Doc Discovery Required |
+|--------------|---------------|------------------------|
+| TYPE A (Conceptual) | 1-2 | YES (Phase 0.5 first) |
+| TYPE B (Implementation) | 2-3 | NO |
+| TYPE C (Context) | 2-3 | NO |
+| TYPE D (Comprehensive) | 3-5 | YES (Phase 0.5 first) |
+
+**Doc Discovery is SEQUENTIAL** (websearch → version → sitemap → investigate)
+
+**Main phase is PARALLEL** once you know where to look
+
+## Evidence Synthesis
+
+### Mandatory Citation Format
+
+Every claim MUST include a permalink:
+
+```markdown
+**Claim**: [What you're asserting]
+
+**Evidence** ([source](https://github.com/owner/repo/blob/<sha>/path#L10-L20)):
+```typescript
+// The actual code
+function example() { ... }
+```
+
+**Explanation**: This works because [specific reason from the code].
+```
+
+### Permalink Construction
+
+```plaintext
+https://github.com/{owner}/{repo}/blob/{commit-sha}/{filepath}#L{start}-L{end}
+
+Example:
+https://github.com/tanstack/query/blob/abc123def/packages/react-query/src/useQuery.ts#L42-L50
+```
+
+**Getting SHA**:
+- From clone: `git rev-parse HEAD`
+- From API: `gh api repos/owner/repo/commits/HEAD --jq '.sha'`
+- From tag: `gh api repos/owner/repo/git/refs/tags/v1.0.0 --jq '.object.sha'`
+
+## Tool Reference
+
+### Primary Tools by Purpose
+
+- **Official Docs**: `context7_resolve-library-id` → `context7_query-docs`
+- **Find Docs URL**: `websearch_web_search_exa("library official documentation")`
+- **Sitemap Discovery**: `webfetch(docs_url + "/sitemap.xml")`
+- **Read Doc Page**: `webfetch(specific_doc_page)`
+- **Latest Info**: `websearch_web_search_exa("query 2026")`
+- **Fast Code Search**: `grep_app_searchGitHub(query, language, useRegexp)`
+- **Deep Code Search**: `gh search code "query" --repo owner/repo`
+- **Clone Repo**: `gh repo clone owner/repo ${TMPDIR:-/tmp}/name -- --depth 1`
+- **Issues/PRs**: `gh search issues/prs "query" --repo owner/repo`
+- **View Issue/PR**: `gh issue/pr view <num> --repo owner/repo --comments`
+- **Release Info**: `gh api repos/owner/repo/releases/latest`
+- **Git History**: `git log`, `git blame`, `git show`
+
+### Temp Directory
+
+```bash
+# Cross-platform
+${TMPDIR:-/tmp}/repo-name
+
+# Examples:
+# macOS: /var/folders/.../repo-name or /tmp/repo-name
+# Linux: /tmp/repo-name
+# Windows: C:\Users\...\AppData\Local\Temp\repo-name
+```
+
+## Usage Examples
+
+### Example 1: Conceptual Question (Type A)
+
+**Query**: How do I use TanStack Query for data fetching?
+
+**Librarian**:
+1. Searches for TanStack Query official docs
+2. Fetches sitemap to find relevant sections
+3. Reads "Getting Started" and "Usage" pages
+4. Uses context7 for query patterns
+5. Searches GitHub for real-world examples
+6. Returns: Official docs links + code examples with permalinks
+
+### Example 2: Implementation Reference (Type B)
+
+**Query**: How does Next.js implement server components?
+
+**Librarian**:
+1. Clones Next.js repo to temp directory
+2. Gets commit SHA for permalinks
+3. Searches for server component implementation
+4. Reads relevant source files
+5. Uses git blame for context
+6. Returns: Explanation with GitHub permalinks to actual code
+
+### Example 3: Context & History (Type C)
+
+**Query**: Why did React remove componentWillMount?
+
+**Librarian**:
+1. Searches React GitHub issues for "componentWillMount deprecated"
+2. Searches React PRs for related changes
+3. Clones React repo, checks git log for lifecycle changes
+4. Reads RFC or issue discussions
+5. Returns: Timeline with issue/PR links, explanation from maintainers
+
+### Example 4: Comprehensive Research (Type D)
+
+**Query**: Explain Vue 3's reactivity system in depth
+
+**Librarian**:
+1. Documentation Discovery: Official Vue 3 docs → sitemap → reactivity section
+2. context7 query for reactivity internals
+3. grep_app search for "reactive", "ref", "computed" in Vue 3 repos
+4. Clone Vue 3 repo, read reactivity package source
+5. Search issues for design decisions
+6. Returns: Comprehensive explanation with doc links + source permalinks
+
+## Failure Recovery
+
+- **context7 not found** → Clone repo, read source + README directly
+- **grep_app no results** → Broaden query, try concept instead of exact name
+- **gh API rate limit** → Use cloned repo in temp directory
+- **Repo not found** → Search for forks or mirrors
+- **Sitemap not found** → Try `/sitemap-0.xml`, `/sitemap_index.xml`, or fetch docs index page
+- **Versioned docs not found** → Fall back to latest version, note this in response
+- **Uncertain** → State uncertainty, propose hypothesis
+
+## Communication Rules
+
+1. **NO TOOL NAMES**: Say "I'll search the codebase" not "I'll use grep_app"
+2. **NO PREAMBLE**: Answer directly, skip "I'll help you with..."
+3. **ALWAYS CITE**: Every code claim needs a permalink
+4. **USE MARKDOWN**: Code blocks with language identifiers
+5. **BE CONCISE**: Facts > opinions, evidence > speculation
+
+## When to Use Librarian
+
+**Use when:**
+- Working with unfamiliar npm/pip/cargo packages
+- Need to understand library internals or behavior
+- Looking for implementation examples in open source
+- Need official documentation or best practices
+- Debugging weird external dependency behavior
+
+**Avoid when:**
+- Searching internal/local codebase (use Explore)
+- Need to implement or modify code (Librarian is read-only)
+- Question is about your own code, not external libraries
+- Simple npm package version check
+
+## Date Awareness
+
+**CRITICAL**: Librarian is date-aware:
+
+- **NEVER search for 2025** - It is NOT 2025 anymore
+- **ALWAYS use current year** (2026+) in search queries
+- Use "library-name topic 2026" NOT "2025"
+- Filter out outdated 2025 results when they conflict with 2026 information
+
+## Related Agents
+
+- **Explore**: Searches internal/local codebase (Librarian searches external)
+- **Oracle**: Provides strategic advice (Librarian provides research)
+- **Sisyphus**: May invoke Librarian for external research
+- **Hephaestus**: Uses Librarian for comprehensive context

@@ -1,0 +1,453 @@
+---
+title: "Configuration Schema"
+description: "Complete reference for OhMyOpenCodeConfigSchema with 28 root fields and Zod v4 validation"
+---
+
+## Overview
+
+The root configuration schema for Oh My OpenAgent uses Zod v4 validation with `safeParse()`. All fields are optional - omitted fields use plugin defaults from each module.
+
+Config files are JSONC format (JSON with comments) and support multi-level merging:
+
+```
+Project (.opencode/oh-my-opencode.jsonc) → User (~/.config/opencode/oh-my-opencode.jsonc) → Defaults
+```
+
+## Schema Location
+
+Defined in `src/config/schema/oh-my-opencode-config.ts`
+
+## Root Fields
+
+The `OhMyOpenCodeConfigSchema` composes 28 root-level configuration fields:
+
+<ParamField path="$schema" type="string" optional>
+  JSON Schema reference for IDE autocomplete
+  
+  ```json
+  {
+    "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/schema.json"
+  }
+  ```
+</ParamField>
+
+<ParamField path="new_task_system_enabled" type="boolean" default="false">
+  Enable new task system for TodoWrite disabler hook
+</ParamField>
+
+<ParamField path="default_run_agent" type="string" optional>
+  Default agent name for `oh-my-opencode run` command
+  
+  Environment variable: `OPENCODE_DEFAULT_AGENT`
+  
+  ```json
+  {
+    "default_run_agent": "Sisyphus"
+  }
+  ```
+</ParamField>
+
+<ParamField path="disabled_mcps" type="array" optional>
+  List of MCP server names to disable
+  
+  ```json
+  {
+    "disabled_mcps": ["websearch", "context7"]
+  }
+  ```
+</ParamField>
+
+<ParamField path="disabled_agents" type="array" optional>
+  List of agent names to disable
+  
+  ```json
+  {
+    "disabled_agents": ["oracle", "librarian"]
+  }
+  ```
+</ParamField>
+
+<ParamField path="disabled_skills" type="array" optional>
+  List of skill names to disable
+  
+  Valid values: `playwright`, `agent-browser`, `dev-browser`, `frontend-ui-ux`, `git-master`
+  
+  ```json
+  {
+    "disabled_skills": ["playwright"]
+  }
+  ```
+</ParamField>
+
+<ParamField path="disabled_hooks" type="array" optional>
+  List of hook names to disable (46 hooks available)
+  
+  ```json
+  {
+    "disabled_hooks": ["comment-checker", "tool-output-truncator"]
+  }
+  ```
+</ParamField>
+
+<ParamField path="disabled_commands" type="array" optional>
+  List of command names to disable
+  
+  ```json
+  {
+    "disabled_commands": ["/fix-compile-error"]
+  }
+  ```
+</ParamField>
+
+<ParamField path="disabled_tools" type="array" optional>
+  List of tool names to disable
+  
+  ```json
+  {
+    "disabled_tools": ["todowrite", "todoread"]
+  }
+  ```
+</ParamField>
+
+<ParamField path="hashline_edit" type="boolean" default="false">
+  Enable hashline_edit tool/hook integrations for improved file editing
+</ParamField>
+
+<ParamField path="model_fallback" type="boolean" default="false">
+  Enable model fallback on API errors
+  
+  Set to `true` to enable automatic model switching when model errors occur
+</ParamField>
+
+<ParamField path="agents" type="object" optional>
+  Agent-specific overrides (21 fields per agent)
+  
+  See [Agent Overrides](/api/config/agents) for full schema
+  
+  ```json
+  {
+    "agents": {
+      "sisyphus": {
+        "category": "ultrabrain",
+        "temperature": 0.7
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="categories" type="object" optional>
+  Category-specific configurations
+  
+  See [Categories](/api/config/categories) for full schema
+  
+  ```json
+  {
+    "categories": {
+      "ultrabrain": {
+        "model": "anthropic/claude-opus-4-5",
+        "temperature": 0.8
+      }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="claude_code" type="object" optional>
+  Claude Code compatibility settings
+  
+  ```json
+  {
+    "claude_code": {
+      "prefer_ui_variant": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="sisyphus_agent" type="object" optional>
+  Sisyphus agent-specific configuration
+  
+  ```json
+  {
+    "sisyphus_agent": {
+      "disabled": false
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="comment_checker" type="object" optional>
+  AI comment detection configuration
+  
+  ```json
+  {
+    "comment_checker": {
+      "enabled": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="experimental" type="object" optional>
+  Experimental feature flags
+  
+  See [Experimental Features](/api/config/experimental) for full schema
+</ParamField>
+
+<ParamField path="auto_update" type="boolean" optional>
+  Enable automatic plugin updates
+</ParamField>
+
+<ParamField path="skills" type="object" optional>
+  Skills configuration (sources, paths, recursive loading)
+  
+  ```json
+  {
+    "skills": {
+      "sources": ["~/.opencode/skills"],
+      "recursive": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="ralph_loop" type="object" optional>
+  Ralph Loop configuration for iterative refinement
+  
+  ```json
+  {
+    "ralph_loop": {
+      "enabled": true,
+      "max_iterations": 3
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="runtime_fallback" type="boolean | object" optional>
+  Runtime fallback configuration
+  
+  Set to `false` to disable, or use object for advanced config:
+  
+  ```json
+  {
+    "runtime_fallback": {
+      "enabled": true,
+      "retry_on_errors": [400, 429],
+      "timeout_seconds": 30
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="background_task" type="object" optional>
+  Background task concurrency settings
+  
+  ```json
+  {
+    "background_task": {
+      "max_concurrent_per_model": 5
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="notification" type="object" optional>
+  OS notification settings
+  
+  ```json
+  {
+    "notification": {
+      "enabled": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="babysitting" type="object" optional>
+  Unstable agent monitoring configuration
+  
+  ```json
+  {
+    "babysitting": {
+      "enabled": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="git_master" type="object" optional>
+  Git commit footer configuration
+  
+  ```json
+  {
+    "git_master": {
+      "commit_footer": "Signed-off-by: Agent"
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="browser_automation_engine" type="object" optional>
+  Browser automation provider selection
+  
+  Valid providers: `playwright`, `agent-browser`, `playwright-cli`
+  
+  ```json
+  {
+    "browser_automation_engine": {
+      "provider": "playwright"
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="websearch" type="object" optional>
+  Websearch provider configuration
+  
+  Valid providers: `exa`, `tavily`
+  
+  ```json
+  {
+    "websearch": {
+      "provider": "exa"
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="tmux" type="object" optional>
+  Tmux session management configuration
+  
+  ```json
+  {
+    "tmux": {
+      "enabled": true,
+      "layout": "tiled"
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="sisyphus" type="object" optional>
+  Task system configuration for Sisyphus agent
+  
+  ```json
+  {
+    "sisyphus": {
+      "max_depth": 3
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="start_work" type="object" optional>
+  Start work configuration (auto_commit)
+  
+  ```json
+  {
+    "start_work": {
+      "auto_commit": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="_migrations" type="array" optional>
+  Migration history to prevent re-applying migrations
+  
+  Example: model version upgrades
+  
+  ```json
+  {
+    "_migrations": ["claude-4-to-4.5", "sonnet-3.7-to-4"]
+  }
+  ```
+</ParamField>
+
+## Config Merging Rules
+
+1. **Deep merge** for: `agents`, `categories`, `claude_code`
+2. **Set union** (concatenate + dedupe) for: `disabled_*` arrays
+3. **Override replaces** for all other fields
+4. **Zod safeParse** fills defaults for omitted fields
+5. **migrateConfigFile** transforms legacy keys automatically
+
+## Example Complete Configuration
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/schema.json",
+  "default_run_agent": "Sisyphus",
+  "model_fallback": true,
+  "agents": {
+    "sisyphus": {
+      "category": "ultrabrain",
+      "temperature": 0.8,
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 10000
+      }
+    },
+    "hephaestus": {
+      "category": "quick",
+      "temperature": 0.5
+    }
+  },
+  "categories": {
+    "ultrabrain": {
+      "model": "anthropic/claude-opus-4-5",
+      "fallback_models": ["openai/gpt-5.4"],
+      "temperature": 0.8
+    },
+    "quick": {
+      "model": "anthropic/claude-sonnet-4",
+      "temperature": 0.5
+    }
+  },
+  "disabled_agents": ["oracle"],
+  "disabled_tools": ["todowrite"],
+  "experimental": {
+    "dynamic_context_pruning": {
+      "enabled": true,
+      "notification": "minimal"
+    },
+    "plugin_load_timeout_ms": 15000
+  },
+  "websearch": {
+    "provider": "exa"
+  }
+}
+```
+
+## TypeScript Types
+
+```typescript
+import type { OhMyOpenCodeConfig } from "oh-my-opencode"
+
+const config: OhMyOpenCodeConfig = {
+  default_run_agent: "Sisyphus",
+  model_fallback: true,
+  // ... other fields
+}
+```
+
+## Schema Validation
+
+All config files are validated with:
+
+```typescript
+import { OhMyOpenCodeConfigSchema } from "oh-my-opencode"
+
+const result = OhMyOpenCodeConfigSchema.safeParse(configData)
+if (!result.success) {
+  console.error(result.error)
+}
+```
+
+## Related
+
+- [Agent Overrides](/api/config/agents)
+- [Categories](/api/config/categories)
+- [Experimental Features](/api/config/experimental)

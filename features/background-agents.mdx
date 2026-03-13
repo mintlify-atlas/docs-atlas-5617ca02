@@ -1,0 +1,380 @@
+---
+title: Background Agents
+description: Parallel task execution system for running multiple AI agents simultaneously
+---
+
+## Overview
+
+Background agents enable parallel execution of multiple AI tasks simultaneously. Instead of waiting for one agent to finish before starting another, you can fire 5+ specialists in parallel, continue your work, and collect results when ready.
+
+This is central to Oh My OpenAgent's multi-agent orchestration capabilities.
+
+## How It Works
+
+### Task Lifecycle
+
+```typescript
+// Task states
+pending → running → completed/error/cancelled/interrupt
+```
+
+1. **Launch**: Create background task with agent type and prompt
+2. **Queue**: Task enters concurrency queue (5 concurrent per model/provider)
+3. **Run**: Agent executes in separate OpenCode session
+4. **Poll**: System polls every 3 seconds for completion
+5. **Complete**: Results returned via `background_output` tool
+
+### Completion Detection
+
+Two signals must agree before a task is marked complete:
+
+1. **Session idle event** - OpenCode reports session became idle
+2. **Stability detection** - Message count unchanged for 10s (3+ stable polls)
+
+This prevents premature completion on brief pauses.
+
+## Usage
+
+### Launching Background Tasks
+
+```typescript
+// Launch explore agents in parallel
+task({
+  subagent_type: "explore",
+  run_in_background: true,
+  description: "Find auth implementations",
+  prompt: "Search for JWT authentication patterns in src/api/"
+})
+
+task({
+  subagent_type: "librarian",
+  run_in_background: true,
+  description: "Find JWT security docs",
+  prompt: "Find OWASP JWT security best practices"
+})
+
+// Continue with other work...
+// System sends notification when each task completes
+```
+
+### Retrieving Results
+
+When a background task completes, you receive a system notification:
+
+```
+<system-reminder>Background task bg_abc123 completed</system-reminder>
+```
+
+Then retrieve the output:
+
+```typescript
+background_output(task_id="bg_abc123")
+```
+
+**Options**:
+- `block`: Wait for task to complete (default: false)
+- `timeout`: Max wait time in seconds
+- `full_session`: Return entire conversation history
+- `include_thinking`: Include thinking blocks
+- `message_limit`: Max messages to return
+- `since_message_id`: Only messages after this ID
+
+### Cancelling Tasks
+
+```typescript
+// Cancel specific task
+background_cancel(taskId="bg_abc123")
+
+// Cancel all background tasks
+background_cancel(all=true)
+```
+
+## Concurrency Management
+
+### Concurrency Limits
+
+Default: **5 concurrent tasks per model/provider**
+
+Concurrency key format: `{providerID}/{modelID}`
+
+Examples:
+- `anthropic/claude-opus-4-6`
+- `openai/gpt-5.3-codex`
+- `google/gemini-3-flash`
+
+### Queue Behavior
+
+- **FIFO queue**: Tasks wait in order when slots full
+- **Slot acquisition**: Task acquires slot when capacity available
+- **Slot release**: Released on completion, error, or cancellation
+
+### Configuring Limits
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "background_task": {
+    "concurrency": {
+      "default": 5,
+      "perModel": {
+        "anthropic/claude-opus-4-6": 3,
+        "openai/gpt-5.3-codex": 8
+      }
+    }
+  }
+}
+```
+
+## Parallel Task Orchestration
+
+### Use Case: Multi-Source Research
+
+Sisyphus fires multiple research agents simultaneously:
+
+```typescript
+// Internal codebase search (3 parallel explores)
+task(subagent_type="explore", run_in_background=true, 
+  prompt="Find authentication middleware patterns")
+task(subagent_type="explore", run_in_background=true,
+  prompt="Find error handling conventions")
+task(subagent_type="explore", run_in_background=true,
+  prompt="Find test patterns for API routes")
+
+// External docs search (2 parallel librarians)
+task(subagent_type="librarian", run_in_background=true,
+  prompt="Find JWT security best practices")
+task(subagent_type="librarian", run_in_background=true,
+  prompt="Find Express authentication patterns")
+
+// Total: 5 agents running in parallel
+```
+
+### Use Case: Multi-Model Execution
+
+Run different models on the same problem:
+
+```typescript
+// Claude analyzes architecture
+task({
+  category: "ultrabrain",
+  run_in_background: true,
+  prompt: "Analyze payment service architecture for bottlenecks"
+})
+
+// GPT implements solution
+task({
+  category: "deep",
+  run_in_background: true,
+  prompt: "Implement connection pooling for payment service"
+})
+
+// Gemini creates documentation
+task({
+  category: "writing",
+  run_in_background: true,
+  prompt: "Document payment service connection pool configuration"
+})
+```
+
+## Background vs Foreground
+
+| Aspect | Foreground | Background |
+|--------|------------|------------|
+| **Blocking** | Yes - waits for completion | No - returns immediately |
+| **Concurrency** | Sequential | Parallel (up to limit) |
+| **Context** | Full parent context visible | Isolated session |
+| **Results** | Immediate | Retrieved via `background_output` |
+| **Use Case** | Single focused task | Multiple parallel tasks |
+
+## Tmux Integration
+
+Enable tmux to visualize background agents in separate panes:
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "tmux": {
+    "enabled": true,
+    "layout": "main-vertical"
+  }
+}
+```
+
+When running inside tmux:
+- Background agents spawn in new panes
+- Watch multiple agents work in real-time
+- Each pane shows agent output live
+- Auto-cleanup when agents complete
+
+### Layout Constraints
+
+- **Minimum pane width**: 52 characters
+- **Minimum pane height**: 11 lines
+- **Main pane**: Always preserved (never split below minimum)
+- **Agent panes**: Split from remaining space
+- **Max grid**: 2 columns × 3 rows = 4 background agents visible
+
+## Advanced Features
+
+### Session Continuity
+
+Every background task returns a `session_id`. Use it to continue work:
+
+```typescript
+// First task
+const result = task({
+  subagent_type: "explore",
+  run_in_background: true,
+  prompt: "Find authentication patterns"
+})
+
+// Later: Continue in same session (preserves context)
+task({
+  session_id: result.session_id,
+  run_in_background: true,
+  prompt: "Also find authorization patterns"
+})
+```
+
+Benefits:
+- Subagent has full conversation context
+- No repeated file reads or exploration
+- Saves 70%+ tokens on follow-ups
+- Agent remembers what it already tried
+
+### Subagent Depth Limits
+
+Prevents infinite delegation loops:
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "background_task": {
+    "max_depth": 3,
+    "max_root_session_spawn_budget": 10
+  }
+}
+```
+
+- **max_depth**: Maximum nesting level (default: 3)
+- **max_root_session_spawn_budget**: Total background tasks per root session (default: 10)
+
+### Task Polling
+
+Polling configuration:
+
+```typescript
+// Constants from source
+POLLING_INTERVAL_MS = 3000  // Poll every 3 seconds
+STABILITY_THRESHOLD = 3     // 3 stable polls = complete (10s total)
+TASK_CLEANUP_DELAY_MS = 5000 // Cleanup 5s after completion
+```
+
+### Stale Task Detection
+
+Background tasks automatically interrupted if:
+- No message updates for configured timeout
+- System detects session is stuck
+- Provider returns retryable error repeatedly
+
+## Common Patterns
+
+### Pattern 1: Research Then Act
+
+```typescript
+// 1. Fire parallel research
+task(subagent_type="explore", run_in_background=true, prompt="...")
+task(subagent_type="librarian", run_in_background=true, prompt="...")
+
+// 2. Do other work while waiting
+// 3. Receive completion notifications
+// 4. Collect results via background_output
+// 5. Act on findings
+```
+
+### Pattern 2: Multi-Track Implementation
+
+```typescript
+// Frontend and backend in parallel
+task(category="visual-engineering", run_in_background=true,
+  prompt="Implement dashboard UI")
+task(category="deep", run_in_background=true,
+  prompt="Implement dashboard API")
+
+// Both complete simultaneously
+```
+
+### Pattern 3: Fallback Strategy
+
+```typescript
+// Try approach A
+const taskA = task(category="quick", run_in_background=true, prompt="...")
+
+// If A fails, try B
+if (taskA.status === "error") {
+  task(category="deep", run_in_background=true, prompt="...")
+}
+```
+
+## Troubleshooting
+
+### Task Stuck in Running
+
+**Cause**: Polling didn't detect completion
+
+**Solutions**:
+1. Check `background_output` with `block=true`
+2. Verify agent isn't waiting for user input
+3. Check session for errors via `session_read`
+4. Cancel and retry: `background_cancel(taskId="...")`
+
+### Concurrency Limit Reached
+
+**Symptom**: Tasks staying in "pending" state
+
+**Solutions**:
+1. Wait for running tasks to complete
+2. Increase concurrency limit in config
+3. Cancel unnecessary tasks
+4. Use different models to distribute load
+
+### Missing Results
+
+**Cause**: Task completed but output not retrieved
+
+**Solutions**:
+1. Check `session_list` for background session
+2. Use `session_read` to view full conversation
+3. Verify task completed successfully
+
+## Performance Considerations
+
+### Token Usage
+
+- Background agents use separate sessions (separate token counts)
+- Each agent's context is isolated (no shared history)
+- Use `session_id` continuation to save tokens on follow-ups
+
+### Cost Optimization
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "categories": {
+    "quick": {
+      "model": "anthropic/claude-haiku-4-5"  // Cheap model for simple tasks
+    }
+  }
+}
+```
+
+### Rate Limits
+
+Different providers have different rate limits:
+- Anthropic: 5 requests/min (Tier 1)
+- OpenAI: 10 requests/min (Tier 1)
+- Google: 2 requests/min (free tier)
+
+Adjust concurrency limits accordingly.
+
+## Related Topics
+
+- [Discipline Agents](/features/discipline-agents) - Sisyphus orchestration
+- [Tmux Integration](/features/tmux-integration) - Visual multi-agent display
+- [Categories](/api/config/categories) - Task delegation system

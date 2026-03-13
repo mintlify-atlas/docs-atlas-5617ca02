@@ -1,0 +1,554 @@
+---
+title: "oh-my-opencode doctor"
+description: "Health diagnostics for installation, configuration, tools, and model resolution"
+---
+
+## Overview
+
+The `doctor` command runs comprehensive health checks across 4 categories: System, Config, Tools, and Models. It validates installation, configuration files, tool availability, and model resolution.
+
+## Command Syntax
+
+```bash
+oh-my-opencode doctor [options]
+```
+
+## Options
+
+<ParamField path="--status" type="flag">
+  Show compact system dashboard
+  
+  Displays overview of system health without detailed diagnostics
+  
+  ```bash
+  oh-my-opencode doctor --status
+  ```
+</ParamField>
+
+<ParamField path="--verbose" type="flag">
+  Show detailed diagnostic information
+  
+  Includes full check results, issues, and recommendations
+  
+  ```bash
+  oh-my-opencode doctor --verbose
+  ```
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Output results in JSON format
+  
+  Useful for scripting and automation
+  
+  ```bash
+  oh-my-opencode doctor --json | jq '.summary'
+  ```
+</ParamField>
+
+## Output Modes
+
+### Default Mode
+
+Shows problems only:
+
+```bash
+oh-my-opencode doctor
+```
+
+Output:
+```
+oh-my-opencode Doctor v1.x.x
+
+ISSUES FOUND:
+
+❌ Config Validation
+   Invalid model override: "sisyphus.model" should use category instead
+   
+⚠️  AST-Grep Binary
+   Binary not found in PATH (optional tool)
+
+───────────────────────────
+Summary: 1 failed, 1 warning, 12 passed (0.8s)
+```
+
+### Status Mode
+
+Compact dashboard:
+
+```bash
+oh-my-opencode doctor --status
+```
+
+Output:
+```
+oh-my-opencode Doctor v1.x.x
+
+SYSTEM
+  ✓ Binary Found
+  ✓ Version Match
+  ✓ Plugin Registered
+
+CONFIG
+  ✓ JSONC Valid
+  ❌ Schema Validation
+
+TOOLS
+  ✓ Comment Checker
+  ⚠️  AST-Grep
+  ✓ GitHub CLI
+  ✓ MCP Servers
+
+MODELS
+  ✓ Cache Exists
+  ✓ Model Resolution
+  ✓ Agent Overrides
+
+───────────────────────────
+Summary: 1 failed, 1 warning, 11 passed (0.8s)
+```
+
+### Verbose Mode
+
+Detailed diagnostics:
+
+```bash
+oh-my-opencode doctor --verbose
+```
+
+Output:
+```
+oh-my-opencode Doctor v1.x.x
+
+SYSTEM CHECKS
+
+✓ Binary Found (0.1s)
+  OpenCode binary: /usr/local/bin/opencode
+  
+✓ Version Match (0.05s)
+  Version: 1.0.150
+  
+✓ Plugin Registered (0.08s)
+  Plugin: oh-my-opencode@1.x.x
+  Config: ~/.config/opencode/config.json
+
+CONFIG CHECKS
+
+✓ JSONC Valid (0.12s)
+  User config: ~/.config/opencode/oh-my-opencode.jsonc
+  
+❌ Schema Validation (0.15s)
+  Invalid field: "sisyphus.model" deprecated, use "sisyphus.category"
+  Location: line 12, column 5
+
+...
+
+───────────────────────────
+Summary: 1 failed, 1 warning, 12 passed (0.8s)
+```
+
+### JSON Mode
+
+```bash
+oh-my-opencode doctor --json
+```
+
+Output:
+```json
+{
+  "results": [
+    {
+      "name": "Binary Found",
+      "status": "pass",
+      "duration": 120,
+      "message": "OpenCode binary found at /usr/local/bin/opencode"
+    },
+    {
+      "name": "Schema Validation",
+      "status": "fail",
+      "duration": 150,
+      "message": "Invalid model override",
+      "issues": [
+        {
+          "title": "Deprecated field",
+          "description": "Use category instead of model",
+          "severity": "error"
+        }
+      ]
+    }
+  ],
+  "systemInfo": {
+    "platform": "darwin",
+    "version": "1.0.150",
+    "pluginVersion": "1.x.x"
+  },
+  "tools": {
+    "astGrep": false,
+    "commentChecker": true,
+    "githubCli": true
+  },
+  "summary": {
+    "total": 14,
+    "passed": 12,
+    "failed": 1,
+    "warnings": 1,
+    "skipped": 0,
+    "duration": 800
+  },
+  "exitCode": 1
+}
+```
+
+## Check Categories
+
+### System Checks
+
+Validates OpenCode installation:
+
+<ParamField path="Binary Found" type="check">
+  Verifies OpenCode binary is in PATH
+  
+  Critical: ❌ Failure blocks plugin usage
+  
+  **Fix**: Install OpenCode
+  ```bash
+  brew install opencode
+  ```
+</ParamField>
+
+<ParamField path="Version Match" type="check">
+  Checks OpenCode version >= 1.0.150
+  
+  Critical: ❌ Failure blocks plugin features
+  
+  **Fix**: Update OpenCode
+  ```bash
+  brew upgrade opencode
+  ```
+</ParamField>
+
+<ParamField path="Plugin Registered" type="check">
+  Verifies plugin is registered in OpenCode config
+  
+  Critical: ❌ Failure blocks plugin loading
+  
+  **Fix**: Run install command
+  ```bash
+  oh-my-opencode install
+  ```
+</ParamField>
+
+<ParamField path="Version Consistency" type="check">
+  Checks installed version matches plugin registration
+  
+  Warning: ⚠️ Mismatch may cause issues
+  
+  **Fix**: Reinstall plugin
+  ```bash
+  oh-my-opencode install
+  ```
+</ParamField>
+
+### Config Checks
+
+Validates configuration files:
+
+<ParamField path="JSONC Valid" type="check">
+  Parses JSONC files for syntax errors
+  
+  Checks:
+  - `~/.config/opencode/oh-my-opencode.jsonc`
+  - `.opencode/oh-my-opencode.jsonc`
+  
+  **Fix**: Correct JSON syntax errors
+</ParamField>
+
+<ParamField path="Schema Validation" type="check">
+  Validates config against Zod schema
+  
+  Checks:
+  - Required field types
+  - Valid enum values
+  - Deprecated fields
+  - Range constraints
+  
+  **Fix**: Update config to match schema
+</ParamField>
+
+<ParamField path="Model Override Syntax" type="check">
+  Validates agent model override syntax
+  
+  Checks:
+  - `provider/model` format
+  - Valid provider names
+  - Deprecated `model` field usage
+  
+  **Fix**: Use `category` instead of `model`
+</ParamField>
+
+### Tools Checks
+
+Validates optional tools:
+
+<ParamField path="AST-Grep Binary" type="check">
+  Checks for `ast-grep` in PATH
+  
+  Optional: ⚠️ Warning only
+  
+  **Fix**: Install AST-Grep
+  ```bash
+  npm install -g @ast-grep/cli
+  ```
+</ParamField>
+
+<ParamField path="Comment Checker" type="check">
+  Validates comment-checker hook status
+  
+  Checks:
+  - Hook enabled in config
+  - Not in disabled_hooks array
+  
+  **Fix**: Enable in config
+  ```json
+  {
+    "comment_checker": {
+      "enabled": true
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="LSP Servers" type="check">
+  Checks LSP server configuration
+  
+  Validates:
+  - Server paths
+  - Initialization options
+  
+  **Fix**: Configure LSP servers in OpenCode
+</ParamField>
+
+<ParamField path="GitHub CLI" type="check">
+  Checks for `gh` command
+  
+  Optional: ⚠️ Warning only (required for PR/issue features)
+  
+  **Fix**: Install GitHub CLI
+  ```bash
+  brew install gh
+  ```
+</ParamField>
+
+<ParamField path="MCP Servers" type="check">
+  Validates MCP server connections
+  
+  Checks:
+  - Built-in MCPs (websearch, context7, grep_app)
+  - Claude Code MCPs (.mcp.json)
+  - Skill-embedded MCPs
+  
+  **Fix**: Check MCP configuration and network
+</ParamField>
+
+### Model Checks
+
+Validates model resolution:
+
+<ParamField path="Cache Exists" type="check">
+  Checks for model cache directory
+  
+  Location: `~/.cache/opencode/models/`
+  
+  **Fix**: Run OpenCode once to create cache
+</ParamField>
+
+<ParamField path="Model Resolution" type="check">
+  Tests model resolution pipeline
+  
+  Validates:
+  - Provider availability
+  - Model ID format
+  - Fallback chain
+  
+  **Fix**: Check provider authentication
+  ```bash
+  opencode auth login
+  ```
+</ParamField>
+
+<ParamField path="Agent Overrides" type="check">
+  Validates agent model overrides
+  
+  Checks:
+  - Valid agent names
+  - Category inheritance
+  - Fallback models
+  
+  **Fix**: Update agent config
+</ParamField>
+
+<ParamField path="Category Overrides" type="check">
+  Validates category configurations
+  
+  Checks:
+  - Valid category names
+  - Model availability
+  - Tool configurations
+  
+  **Fix**: Update category config
+</ParamField>
+
+## Exit Codes
+
+- **0**: All checks passed (or only warnings)
+- **1**: At least one check failed
+
+## Examples
+
+### Quick Health Check
+
+```bash
+oh-my-opencode doctor
+```
+
+Shows problems only. Exit code 0 if healthy.
+
+### Detailed Diagnostics
+
+```bash
+oh-my-opencode doctor --verbose
+```
+
+Shows all checks with detailed output.
+
+### System Dashboard
+
+```bash
+oh-my-opencode doctor --status
+```
+
+Compact overview of all check categories.
+
+### CI/CD Integration
+
+```bash
+#!/bin/bash
+oh-my-opencode doctor --json > doctor-report.json
+
+if [ $? -eq 0 ]; then
+  echo "Health checks passed"
+else
+  echo "Health checks failed"
+  jq '.results[] | select(.status == "fail")' doctor-report.json
+  exit 1
+fi
+```
+
+### Scripted Validation
+
+```bash
+PASSED=$(oh-my-opencode doctor --json | jq '.summary.passed')
+FAILED=$(oh-my-opencode doctor --json | jq '.summary.failed')
+
+echo "Passed: $PASSED, Failed: $FAILED"
+```
+
+## Common Issues
+
+### OpenCode Binary Not Found
+
+```
+❌ Binary Found
+   OpenCode binary not found in PATH
+```
+
+**Solution**: Install OpenCode
+
+```bash
+brew install opencode
+# or visit https://opencode.ai/docs
+```
+
+### Plugin Not Registered
+
+```
+❌ Plugin Registered
+   Plugin oh-my-opencode not found in config
+```
+
+**Solution**: Run install
+
+```bash
+oh-my-opencode install
+```
+
+### Invalid Config Syntax
+
+```
+❌ JSONC Valid
+   Unexpected token at line 12
+```
+
+**Solution**: Fix JSON syntax
+
+```bash
+cat ~/.config/opencode/oh-my-opencode.jsonc | jsonlint
+```
+
+### Schema Validation Errors
+
+```
+❌ Schema Validation
+   Invalid field: "sisyphus.model" deprecated
+```
+
+**Solution**: Update config
+
+```json
+{
+  "agents": {
+    "sisyphus": {
+      "category": "ultrabrain"  // Use category instead of model
+    }
+  }
+}
+```
+
+### Model Resolution Failed
+
+```
+❌ Model Resolution
+   Failed to resolve model for agent "sisyphus"
+```
+
+**Solution**: Authenticate providers
+
+```bash
+opencode auth login
+# Select: Anthropic, Google, or GitHub
+```
+
+## Performance
+
+Doctor runs checks in parallel:
+
+- **System checks**: ~0.2s
+- **Config checks**: ~0.3s
+- **Tools checks**: ~0.5s
+- **Model checks**: ~0.3s
+- **Total**: ~0.8s (with parallel execution)
+
+## Related Commands
+
+- [install](/api/cli/install) - Install and configure plugin
+- [run](/api/cli/run) - Non-interactive session launcher
+
+## Source Code
+
+Implementation:
+- `src/cli/doctor/runner.ts` - Main orchestration
+- `src/cli/doctor/checks/` - Check implementations
+  - `system.ts` - System checks
+  - `config.ts` - Config checks
+  - `tools.ts` - Tools checks
+  - `model-resolution.ts` - Model checks
+- `src/cli/doctor/formatter.ts` - Output formatting

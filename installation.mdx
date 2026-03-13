@@ -1,0 +1,502 @@
+---
+title: Installation
+description: Complete installation guide for Oh My OpenAgent with step-by-step instructions for all model providers.
+---
+
+# Installation
+
+## Prerequisites
+
+Before installing Oh My OpenAgent, ensure you have:
+
+- **OpenCode** version 1.0.150 or higher ([Installation Guide](https://opencode.ai/docs))
+- At least one of the following subscriptions:
+  - Claude Pro/Max Subscription
+  - OpenAI/ChatGPT Plus Subscription
+  - Google Gemini access
+  - GitHub Copilot Subscription
+  - OpenCode Go subscription ($10/month for GLM-5, Kimi K2.5, MiniMax M2.5)
+  - OpenCode Zen access
+  - Z.ai Coding Plan subscription
+
+<Note>
+**For the best experience**, we strongly recommend having at least a **Claude Pro or Max subscription**. Sisyphus is optimized for Claude models.
+</Note>
+
+## Quick Installation
+
+<Tabs>
+  <Tab title="For Humans">
+    The easiest way to install is to let an agent do it for you. Copy and paste this prompt to your LLM agent (Claude Code, Cursor, etc.):
+
+    ```text
+    Install and configure oh-my-opencode by following the instructions here:
+    https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/installation.md
+    ```
+
+    Seriously, let an agent do it. Humans fat-finger configs.
+  </Tab>
+
+  <Tab title="For Manual Setup">
+    If you prefer to install manually, run the interactive installer:
+
+    <CodeGroup>
+    ```bash Bun (Recommended)
+    bunx oh-my-opencode install
+    ```
+
+    ```bash NPM
+    npx oh-my-opencode install
+    ```
+    </CodeGroup>
+
+    The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
+
+    **Supported platforms:** macOS (ARM64, x64), Linux (x64, ARM64, Alpine/musl), Windows (x64)
+  </Tab>
+</Tabs>
+
+## Step-by-Step Installation
+
+<Steps>
+  <Step title="Verify OpenCode Installation">
+    First, check that OpenCode is installed:
+
+    ```bash
+    opencode --version
+    ```
+
+    You should see version 1.0.150 or higher. If not, install OpenCode first from [opencode.ai/docs](https://opencode.ai/docs).
+  </Step>
+
+  <Step title="Run the Installer">
+    The installer will ask about your subscriptions to configure optimal model assignments:
+
+    ```bash
+    bunx oh-my-opencode install
+    ```
+
+    <Note>
+    For non-interactive installation (useful for agents or CI/CD), you can pass flags:
+
+    ```bash
+    bunx oh-my-opencode install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no
+    ```
+    </Note>
+
+    The installer will:
+    - Register the plugin in `opencode.json`
+    - Configure agent models based on your subscriptions
+    - Show which authentication steps are needed
+  </Step>
+
+  <Step title="Verify Plugin Registration">
+    Check that the plugin was registered correctly:
+
+    ```bash
+    cat ~/.config/opencode/opencode.json
+    ```
+
+    You should see `"oh-my-opencode"` in the plugin array:
+
+    ```json
+    {
+      "plugin": ["oh-my-opencode"]
+    }
+    ```
+  </Step>
+</Steps>
+
+## Provider Authentication
+
+After installation, authenticate with your model providers:
+
+### Claude (Anthropic)
+
+<Steps>
+  <Step title="Start Authentication">
+    ```bash
+    opencode auth login
+    ```
+  </Step>
+
+  <Step title="Select Provider">
+    In the interactive terminal:
+    - Provider: Select **Anthropic**
+    - Login method: Select **Claude Pro/Max**
+  </Step>
+
+  <Step title="Complete OAuth">
+    Follow the OAuth flow in your browser. Wait for completion and verify success.
+  </Step>
+</Steps>
+
+### OpenAI (ChatGPT)
+
+Authentication for OpenAI follows the same pattern:
+
+```bash
+opencode auth login
+# Provider: OpenAI
+# Login method: Follow prompts
+```
+
+### Google Gemini (Antigravity OAuth)
+
+<Warning>
+Gemini requires the `opencode-antigravity-auth` plugin for OAuth authentication.
+</Warning>
+
+<Steps>
+  <Step title="Install Antigravity Plugin">
+    Add the plugin to your `opencode.json`:
+
+    ```json
+    {
+      "plugin": ["oh-my-opencode", "opencode-antigravity-auth@latest"]
+    }
+    ```
+  </Step>
+
+  <Step title="Configure Models">
+    Read the [opencode-antigravity-auth documentation](https://github.com/NoeFabris/opencode-antigravity-auth) and add the full model configuration to your `opencode.json`.
+
+    The plugin uses a **variant system** instead of separate model entries:
+
+    ```json
+    {
+      "model": {
+        "google/antigravity-gemini-3-pro": {
+          "variants": ["low", "high"]
+        },
+        "google/antigravity-gemini-3-flash": {
+          "variants": ["minimal", "low", "medium", "high"]
+        }
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Override Agent Models">
+    In your `oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+
+    ```json
+    {
+      "agents": {
+        "multimodal-looker": {
+          "model": "google/antigravity-gemini-3-flash"
+        }
+      }
+    }
+    ```
+
+    **Available Antigravity models:**
+    - `google/antigravity-gemini-3-pro` (variants: `low`, `high`)
+    - `google/antigravity-gemini-3-flash` (variants: `minimal`, `low`, `medium`, `high`)
+    - `google/antigravity-claude-sonnet-4-6`
+    - `google/antigravity-claude-sonnet-4-6-thinking` (variants: `low`, `max`)
+    - `google/antigravity-claude-opus-4-5-thinking` (variants: `low`, `max`)
+  </Step>
+
+  <Step title="Authenticate">
+    ```bash
+    opencode auth login
+    # Provider: Google
+    # Login method: OAuth with Google (Antigravity)
+    ```
+
+    Complete sign-in in browser (auto-detected).
+
+    <Note>
+    **Multi-Account Support:** The plugin supports up to 10 Google accounts for automatic load balancing when rate limits are hit.
+    </Note>
+  </Step>
+</Steps>
+
+### GitHub Copilot
+
+GitHub Copilot is supported as a **fallback provider** when native providers are unavailable.
+
+<Steps>
+  <Step title="Enable During Installation">
+    When running the installer, select "Yes" for GitHub Copilot:
+
+    ```bash
+    bunx oh-my-opencode install --no-tui --copilot=yes
+    ```
+  </Step>
+
+  <Step title="Authenticate">
+    ```bash
+    opencode auth login
+    # Select: GitHub → Authenticate via OAuth
+    ```
+  </Step>
+</Steps>
+
+**Model mappings when Copilot is the best available provider:**
+
+| Agent | Model |
+|-------|-------|
+| Sisyphus | `github-copilot/claude-opus-4-6` |
+| Oracle | `github-copilot/gpt-5.4` |
+| Explore | `github-copilot/grok-code-fast-1` |
+| Librarian | `github-copilot/gemini-3-flash` |
+
+### Z.ai Coding Plan
+
+Z.ai Coding Plan provides access to GLM-5 and GLM-4.6v models:
+
+```bash
+bunx oh-my-opencode install --no-tui --zai-coding-plan=yes
+```
+
+**Main fallback models:**
+
+| Agent | Model |
+|-------|-------|
+| Sisyphus | `zai-coding-plan/glm-5` |
+| Visual Engineering | `zai-coding-plan/glm-5` |
+| Multimodal Looker | `zai-coding-plan/glm-4.6v` |
+
+### OpenCode Zen
+
+OpenCode Zen provides access to `opencode/` prefixed models:
+
+```bash
+bunx oh-my-opencode install --no-tui --opencode-zen=yes
+```
+
+**Available models:**
+- `opencode/claude-opus-4-6`
+- `opencode/gpt-5.4`
+- `opencode/gpt-5.3-codex`
+- `opencode/gpt-5-nano`
+- `opencode/glm-5`
+- `opencode/big-pickle`
+- `opencode/minimax-m2.5-free`
+
+### OpenCode Go
+
+OpenCode Go is a $10/month subscription providing access to GLM-5, Kimi K2.5, and MiniMax M2.5 models:
+
+```bash
+bunx oh-my-opencode install --no-tui --opencode-go=yes
+```
+
+## Provider Priority Chain
+
+When multiple providers are available, Oh My OpenAgent uses this priority:
+
+```
+Native (anthropic/, openai/, google/) → Kimi for Coding → GitHub Copilot → Venice → OpenCode Zen → Z.ai Coding Plan
+```
+
+## Model Configuration
+
+### Understanding Model Families
+
+<Accordion title="Claude-like Models" icon="brain">
+  These models excel at instruction-following and structured output:
+
+  | Model | Provider(s) | Notes |
+  |-------|-------------|-------|
+  | Claude Opus 4.6 | anthropic, github-copilot, opencode | Best overall. Default for Sisyphus. |
+  | Claude Sonnet 4.6 | anthropic, github-copilot, opencode | Faster, cheaper. Good balance. |
+  | Kimi K2.5 | kimi-for-coding | Behaves very similarly to Claude. Great all-rounder. |
+  | GLM 5 | zai-coding-plan, opencode | Claude-like behavior. Good for broad tasks. |
+</Accordion>
+
+<Accordion title="GPT Models" icon="robot">
+  These models excel at explicit reasoning and principle-driven tasks:
+
+  | Model | Provider(s) | Notes |
+  |-------|-------------|-------|
+  | GPT-5.3-codex | openai, github-copilot, opencode | Deep coding powerhouse. Required for Hephaestus. |
+  | GPT-5.4 | openai, github-copilot, opencode | High intelligence. Default for Oracle. |
+  | GPT-5-Nano | opencode | Ultra-cheap, fast. Good for simple utility tasks. |
+</Accordion>
+
+<Accordion title="Specialized Models" icon="sparkles">
+  Different reasoning styles for specific tasks:
+
+  | Model | Provider(s) | Notes |
+  |-------|-------------|-------|
+  | Gemini 3 Pro | google, github-copilot, opencode | Excels at visual/frontend tasks. |
+  | Gemini 3 Flash | google, github-copilot, opencode | Fast, good for doc search. |
+  | MiniMax M2.5 | venice, opencode | Fast and smart for utility tasks. |
+  | Grok Code Fast 1 | github-copilot, venice | Optimized for code grep/search. |
+</Accordion>
+
+### Custom Model Configuration
+
+You can override models in `~/.config/opencode/oh-my-opencode.jsonc` or `.opencode/oh-my-opencode.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+
+  "agents": {
+    // Main orchestrator: Claude Opus or Kimi K2.5 work best
+    "sisyphus": {
+      "model": "kimi-for-coding/k2p5",
+      "ultrawork": {
+        "model": "anthropic/claude-opus-4-6",
+        "variant": "max"
+      }
+    },
+
+    // Research agents: cheaper models are fine
+    "librarian": { "model": "google/gemini-3-flash" },
+    "explore": { "model": "github-copilot/grok-code-fast-1" },
+
+    // Architecture consultation: GPT or Claude Opus
+    "oracle": {
+      "model": "openai/gpt-5.4",
+      "variant": "high"
+    }
+  },
+
+  "categories": {
+    // Frontend work: Gemini dominates visual tasks
+    "visual-engineering": {
+      "model": "google/gemini-3.1-pro",
+      "variant": "high"
+    },
+
+    // General high-effort work
+    "unspecified-high": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max"
+    },
+
+    // Quick tasks: use the cheapest models
+    "quick": { "model": "anthropic/claude-haiku-4-5" },
+
+    // Deep reasoning: GPT-5.4
+    "ultrabrain": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh"
+    }
+  }
+}
+```
+
+<Warning>
+**Safe vs Dangerous Overrides:**
+
+**Safe** (same family):
+- Sisyphus: Opus → Sonnet, Kimi K2.5, GLM 5
+- Prometheus: Opus → GPT-5.4 (auto-switches prompt)
+
+**Dangerous** (no prompt support):
+- Sisyphus → GPT: **No GPT prompt. Will degrade significantly.**
+- Hephaestus → Claude: **Built for Codex. Claude can't replicate this.**
+- Explore → Opus: **Massive cost waste. Explore needs speed, not intelligence.**
+</Warning>
+
+## Verification
+
+After installation and authentication, verify everything works:
+
+<Steps>
+  <Step title="Check Version">
+    ```bash
+    opencode --version
+    ```
+
+    Should show 1.0.150 or higher.
+  </Step>
+
+  <Step title="Verify Plugin">
+    ```bash
+    cat ~/.config/opencode/opencode.json
+    ```
+
+    Should contain `"oh-my-opencode"` in the plugin array.
+  </Step>
+
+  <Step title="Run Doctor">
+    ```bash
+    bunx oh-my-opencode doctor
+    ```
+
+    This checks:
+    - OpenCode installation
+    - Plugin configuration
+    - Model authentication
+    - Configuration syntax
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Plugin not loading" icon="triangle-exclamation">
+    **Symptoms:** OpenCode starts but Oh My OpenAgent features aren't available.
+
+    **Solutions:**
+    1. Verify plugin is in `opencode.json`: `cat ~/.config/opencode/opencode.json`
+    2. Check for syntax errors: `bunx oh-my-opencode doctor`
+    3. Check logs: `tail -f /tmp/oh-my-opencode.log`
+    4. Restart OpenCode completely
+  </Accordion>
+
+  <Accordion title="Authentication failures" icon="key">
+    **Symptoms:** Models return authentication errors.
+
+    **Solutions:**
+    1. Re-authenticate: `opencode auth login`
+    2. Check subscription status on provider website
+    3. Verify API keys in `~/.config/opencode/`
+    4. For Gemini, ensure `opencode-antigravity-auth` is installed
+  </Accordion>
+
+  <Accordion title="Model fallback not working" icon="arrows-rotate">
+    **Symptoms:** Agent fails instead of falling back to another model.
+
+    **Solutions:**
+    1. Check your provider priority in config
+    2. Verify at least one provider is authenticated
+    3. Check model availability: some require specific subscriptions
+    4. Review fallback chain in config
+  </Accordion>
+
+  <Accordion title="Configuration errors" icon="file-exclamation">
+    **Symptoms:** Invalid configuration warnings or errors.
+
+    **Solutions:**
+    1. Run `bunx oh-my-opencode doctor`
+    2. Validate JSON syntax in config files
+    3. Use JSONC format (supports comments)
+    4. Reference schema: `$schema` URL in config
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+You're all set! Here's what to do next:
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Get your first agent working in minutes
+  </Card>
+
+  <Card title="Configuration Reference" icon="gear" href="/guides/configuration">
+    Explore all configuration options
+  </Card>
+
+  <Card title="Join Discord" icon="discord" href="https://discord.gg/PUwSMR9XNk">
+    Get help from the community
+  </Card>
+
+  <Card title="GitHub" icon="github" href="https://github.com/code-yeongyu/oh-my-openagent">
+    Star the repo and follow updates
+  </Card>
+</CardGroup>
+
+<Note>
+**Feeling lazy?** Just type `ultrawork` and let the agent handle everything.
+
+**Need precision?** Press **Tab** to enter Prometheus mode, create a plan, then run `/start-work`.
+</Note>

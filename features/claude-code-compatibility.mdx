@@ -1,0 +1,541 @@
+---
+title: Claude Code Compatibility
+description: Full compatibility with Claude Code - hooks, commands, skills, MCPs, and plugins all work unchanged
+---
+
+## Overview
+
+Oh My OpenAgent is fully compatible with Claude Code configurations. Everything you've set up for Claude Code works here without changes:
+
+- **Hooks**: All hook events and patterns supported
+- **Commands**: Slash commands from `.claude/commands/`
+- **Skills**: SKILL.md files from `.claude/skills/`
+- **MCPs**: MCP servers from `.claude.json` and `.mcp.json`
+- **Agents**: Custom agents from `.claude/agents/`
+- **Rules**: Conditional rules from `.claude/rules/`
+
+<Note>
+  If it works in Claude Code, it works in Oh My OpenAgent. Zero migration needed.
+</Note>
+
+## File Locations
+
+Oh My OpenAgent discovers Claude Code files automatically:
+
+### Commands
+
+```
+~/.claude/commands/*.md          # User-level commands
+.claude/commands/*.md            # Project-level commands
+~/.config/opencode/commands/*.md # OpenCode alternative
+.opencode/command/*.md           # Oh My OpenAgent alternative
+```
+
+### Skills
+
+```
+~/.claude/skills/*/SKILL.md      # User-level skills
+.claude/skills/*/SKILL.md        # Project-level skills
+~/.config/opencode/skills/*/SKILL.md  # OpenCode alternative
+.opencode/skills/*/SKILL.md      # Oh My OpenAgent alternative
+```
+
+### MCPs
+
+```
+~/.claude.json                   # User-level MCPs
+.claude/.mcp.json                # Project-level MCPs
+~/.config/opencode/.mcp.json     # OpenCode alternative
+.mcp.json                        # Root alternative
+```
+
+### Agents
+
+```
+~/.claude/agents/*.md            # User-level agents
+.claude/agents/*.md              # Project-level agents
+~/.config/opencode/agents/*.md   # OpenCode alternative
+.opencode/agents/*.md            # Oh My OpenAgent alternative
+```
+
+### Rules
+
+```
+~/.claude/rules/*.md             # User-level rules
+.claude/rules/*.md               # Project-level rules
+```
+
+### Hooks
+
+```
+~/.claude/settings.json          # User-level hooks
+.claude/settings.json            # Project-level hooks
+.claude/settings.local.json      # Local (git-ignored) hooks
+```
+
+## Priority Order
+
+When multiple locations exist, Oh My OpenAgent uses this priority:
+
+1. **Project OpenCode**: `.opencode/` (highest priority)
+2. **Project Claude**: `.claude/`
+3. **User OpenCode**: `~/.config/opencode/`
+4. **User Claude**: `~/.claude/`
+5. **Built-in**: Oh My OpenAgent defaults (lowest priority)
+
+Same-named items at higher priority override lower.
+
+## Hooks Compatibility
+
+### Hook Events
+
+All Claude Code hook events are supported:
+
+```json src/.claude/settings.json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [{ "type": "command", "command": "eslint --fix $FILE" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [{ "type": "command", "command": "prettier --write $FILE" }]
+      }
+    ]
+  }
+}
+```
+
+### Hook Variables
+
+All Claude Code variables work:
+
+- `$FILE`: File path being operated on
+- `$CONTENT`: File content (PostToolUse only)
+- `$TOOL`: Tool name (e.g., "Write", "Edit")
+- `$ARGS`: Tool arguments as JSON
+
+### Hook Matchers
+
+Regex matchers work identically:
+
+```json
+{
+  "matcher": "Write|Edit"           // Match Write OR Edit
+  "matcher": ".*"                   // Match all tools
+  "matcher": "^Write$"              // Match exactly Write
+  "matcher": "bash.*"               // Match bash, bash-sync, etc.
+}
+```
+
+## MCP Compatibility
+
+### MCP Configuration
+
+Claude Code `.mcp.json` files work unchanged:
+
+```json src/.claude/.mcp.json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-slack"],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
+      }
+    }
+  }
+}
+```
+
+### Environment Variable Expansion
+
+`${VAR}` syntax works identically:
+
+```json
+{
+  "env": {
+    "API_KEY": "${MY_API_KEY}",           // From shell
+    "DATABASE_URL": "${DATABASE_URL}",   // From .env
+    "SECRET": "${SECRET}"                 // From .env.local
+  }
+}
+```
+
+Variables are resolved from:
+1. Shell environment variables
+2. `.env` file
+3. `.env.local` file (git-ignored)
+
+## Skills Compatibility
+
+### Skill Format
+
+Claude Code SKILL.md format is fully supported:
+
+```yaml src/.claude/skills/my-skill/SKILL.md
+---
+name: my-skill
+description: My custom skill
+tools: [Bash, Read, Write]
+model: claude-opus-4
+---
+
+Your skill instructions here...
+```
+
+All frontmatter fields work:
+- `name`: Skill name
+- `description`: Skill description
+- `tools`: Allowed tools (optional)
+- `model`: Preferred model (optional)
+- `agent`: Target agent (optional)
+- `subtask`: Mark as subtask-only (optional)
+
+### MCP in Skills
+
+Claude Code skill MCP syntax works:
+
+```yaml
+mcp:
+  - name: my-mcp
+    type: stdio
+    command: npx
+    args: ["-y", "my-mcp-server"]
+    env:
+      API_KEY: "${API_KEY}"
+```
+
+## Commands Compatibility
+
+### Command Format
+
+Claude Code command format is fully supported:
+
+```markdown src/.claude/commands/deploy.md
+---
+name: deploy
+description: Deploy to production
+---
+
+You are a deployment specialist.
+Follow these steps to deploy:
+
+1. Run tests
+2. Build production bundle
+3. Deploy to staging
+4. Run smoke tests
+5. Deploy to production
+```
+
+### Template Variables
+
+All template variables work:
+
+```markdown
+Directory: {{directory}}
+Agent: {{agent}}
+Model: {{model}}
+```
+
+## Agents Compatibility
+
+### Agent Format
+
+Claude Code agent format is fully supported:
+
+```markdown src/.claude/agents/reviewer.md
+---
+name: reviewer
+description: Code review specialist
+model: claude-opus-4
+tools: [Read, Bash]
+---
+
+You are a code review specialist.
+Focus on:
+- Code quality
+- Security issues
+- Performance concerns
+- Best practices
+```
+
+## Rules Compatibility
+
+### Rule Format
+
+Claude Code rules format is fully supported:
+
+```markdown src/.claude/rules/typescript.md
+---
+globs: ["*.ts", "*.tsx"]
+description: TypeScript coding rules
+---
+
+- Use PascalCase for interface names
+- Use camelCase for function names
+- Prefer const over let
+- No `any` types unless absolutely necessary
+```
+
+### Rule Application
+
+Rules apply identically:
+- `globs` field: Match file patterns
+- `alwaysApply: true`: Apply to all files
+- Walks upward: Project rules override user rules
+
+## Migration Guide
+
+<Steps>
+  <Step title="No Migration Needed">
+    If you're using Claude Code configs, they work immediately in Oh My OpenAgent.
+  </Step>
+  
+  <Step title="Optional: Use OpenCode Paths">
+    To organize separately, copy files to OpenCode equivalents:
+    
+    ```bash
+    # Commands
+    cp -r ~/.claude/commands/* ~/.config/opencode/commands/
+    
+    # Skills
+    cp -r ~/.claude/skills/* ~/.config/opencode/skills/
+    
+    # MCPs
+    cp ~/.claude.json ~/.config/opencode/.mcp.json
+    
+    # Agents
+    cp -r ~/.claude/agents/* ~/.config/opencode/agents/
+    ```
+  </Step>
+  
+  <Step title="Optional: Configure Oh My OpenAgent">
+    Add Oh My OpenAgent-specific features:
+    
+    ```json src/.opencode/oh-my-opencode.jsonc
+    {
+      "agents": {
+        "sisyphus": {
+          "model": "anthropic/claude-opus-4-6"
+        }
+      },
+      "categories": {
+        "visual-engineering": {
+          "model": "google/gemini-3.1-pro"
+        }
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Test Compatibility">
+    Verify everything works:
+    
+    ```bash
+    # List loaded skills
+    opencode skills list
+    
+    # List loaded commands
+    opencode commands list
+    
+    # Test a command
+    /my-command
+    ```
+  </Step>
+</Steps>
+
+## Enhanced Features
+
+Oh My OpenAgent extends Claude Code compatibility with additional features:
+
+### Built-in Discipline Agents
+
+```json
+{
+  "agents": {
+    "sisyphus": { ... },   // Main orchestrator
+    "hephaestus": { ... }, // Deep worker
+    "prometheus": { ... }  // Strategic planner
+  }
+}
+```
+
+### Category System
+
+Delegate tasks via categories:
+
+```json
+{
+  "categories": {
+    "visual-engineering": { "model": "google/gemini-3.1-pro" },
+    "ultrabrain": { "model": "openai/gpt-5.4" },
+    "deep": { "model": "openai/gpt-5.3-codex" }
+  }
+}
+```
+
+### Background Agents
+
+Run multiple agents in parallel:
+
+```typescript
+task(subagent_type="explore", run_in_background=true, prompt="...")
+task(subagent_type="librarian", run_in_background=true, prompt="...")
+```
+
+### Skill-Embedded MCPs
+
+On-demand MCP servers in skills:
+
+```yaml
+mcp:
+  playwright:
+    command: npx
+    args: ["-y", "@playwright/mcp@latest"]
+```
+
+### Hash-Anchored Edits
+
+LINE#ID validation for safe edits:
+
+```typescript
+{
+  op: "replace",
+  pos: "22#XJ",
+  lines: "new content"
+}
+```
+
+## Disabling Compatibility
+
+If you don't want Claude Code compatibility:
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "claude_code": {
+    "enabled": false
+  }
+}
+```
+
+This disables:
+- `.claude/` path discovery
+- `settings.json` hook loading
+- `.claude.json` MCP loading
+
+<Warning>
+  Only disable if you're certain you don't use any Claude Code configs.
+</Warning>
+
+## Troubleshooting
+
+### Skills Not Loading
+
+**Symptom**: Claude Code skills not appearing
+
+**Solutions**:
+1. Check file path: `.claude/skills/*/SKILL.md`
+2. Verify YAML frontmatter is valid
+3. Check logs: `/tmp/oh-my-opencode.log`
+4. Ensure `claude_code.enabled: true` in config
+
+### Hooks Not Running
+
+**Symptom**: `settings.json` hooks not executing
+
+**Solutions**:
+1. Check file path: `.claude/settings.json`
+2. Verify JSON is valid
+3. Test command manually: `eslint --fix file.ts`
+4. Check hook matcher regex
+
+### MCPs Not Starting
+
+**Symptom**: `.claude.json` MCPs not available
+
+**Solutions**:
+1. Check file path: `~/.claude.json` or `.claude/.mcp.json`
+2. Verify JSON is valid
+3. Test command manually: `npx -y @modelcontextprotocol/server-github`
+4. Check environment variables are set
+
+## Best Practices
+
+### Organizing Configs
+
+<Tabs>
+  <Tab title="Shared (Claude Code)">
+    Use `.claude/` for configs shared between Claude Code and Oh My OpenAgent:
+    
+    ```
+    .claude/
+    ├── skills/
+    ├── commands/
+    ├── agents/
+    └── settings.json
+    ```
+  </Tab>
+  
+  <Tab title="Oh My OpenAgent Only">
+    Use `.opencode/` for Oh My OpenAgent-specific configs:
+    
+    ```
+    .opencode/
+    ├── oh-my-opencode.jsonc
+    ├── skills/
+    └── command/
+    ```
+  </Tab>
+</Tabs>
+
+### Version Control
+
+```gitignore src/.gitignore
+# Shared configs (commit)
+.claude/commands/
+.claude/skills/
+.claude/agents/
+.claude/rules/
+
+# Local configs (don't commit)
+.claude/settings.local.json
+.claude/.mcp.json  # Contains secrets
+```
+
+### Testing Compatibility
+
+Before migrating:
+
+```bash
+# 1. Test skills load
+opencode skills list
+
+# 2. Test commands work
+/my-command
+
+# 3. Test hooks run
+# Edit a file and check hook executed
+
+# 4. Test MCPs available
+# Use an MCP tool and verify it works
+```
+
+## Related Topics
+
+- [Skills](/guides/skills) - Skill system overview
+- [Commands](/guides/commands) - Slash commands
+- [Hooks](/guides/hooks) - Lifecycle hooks
+- [MCPs](/features/built-in-mcps) - MCP server configuration

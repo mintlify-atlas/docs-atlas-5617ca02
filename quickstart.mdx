@@ -1,80 +1,471 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with Oh My OpenAgent in minutes. Learn how to use ultrawork, basic commands, and your first agent tasks.
 ---
 
-## Get started in three steps
+# Quickstart
 
-Get your documentation site running locally and make your first customization.
+This guide will get you from zero to shipping code with Oh My OpenAgent in minutes.
 
-### Step 1: Set up your local environment
+<Note>
+Make sure you've completed the [installation](/installation) and authenticated at least one model provider before continuing.
+</Note>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Your First Command: Ultrawork
 
-### Step 2: Deploy your changes
+The fastest way to experience Oh My OpenAgent is with a single command:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+```bash
+ultrawork
+```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+Or use the shorthand:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```bash
+ulw
+```
 
-### Step 3: Go live
+That's it. You don't need to know anything else.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+### What Happens When You Type Ultrawork
 
-## Next steps
+When you include `ultrawork` or `ulw` in your prompt, the agent:
 
-Now that you have your docs running, explore these key features:
+<Steps>
+  <Step title="Analyzes Your Intent">
+    The **Intent Gate** classifies what you actually want—not just the literal words you typed.
+  </Step>
+
+  <Step title="Explores the Codebase">
+    **Sisyphus** fires up background agents to understand your project structure, conventions, and patterns.
+  </Step>
+
+  <Step title="Delegates to Specialists">
+    Based on the task type, Sisyphus delegates to the right specialist:
+    - **Hephaestus** for deep coding work
+    - **Oracle** for architecture decisions
+    - **Librarian** for documentation search
+    - **Explore** for codebase grep
+  </Step>
+
+  <Step title="Implements in Parallel">
+    Multiple agents work simultaneously—research, implementation, and verification happening in parallel.
+  </Step>
+
+  <Step title="Keeps Working Until Done">
+    The **Todo Enforcer** ensures the agent doesn't go idle. The **Ralph Loop** keeps iterating until 100% complete.
+  </Step>
+</Steps>
+
+### Example: Adding a Feature
+
+Let's say you want to add user authentication to your app:
+
+```text
+ultrawork: Add JWT-based authentication with login and signup endpoints
+```
+
+The agent will:
+1. Research your current API structure
+2. Check for existing auth libraries
+3. Implement the JWT logic
+4. Add login/signup routes
+5. Write tests
+6. Verify with LSP diagnostics
+7. Report completion
+
+**You don't write a single line.** Just describe what you want.
+
+## Using Prometheus for Planning
+
+For more complex tasks, you want a plan before execution. That's where **Prometheus** comes in.
+
+<Steps>
+  <Step title="Enter Prometheus Mode">
+    Press **Tab** in your OpenCode session to switch to Prometheus mode.
+
+    Or explicitly invoke it:
+    ```text
+    @plan "Refactor authentication to use OAuth2"
+    ```
+  </Step>
+
+  <Step title="Answer Interview Questions">
+    Prometheus will interview you like a real engineer:
+    - What OAuth providers do you want to support?
+    - Should we keep JWT as a fallback?
+    - Do you have existing user data to migrate?
+    - What's the priority: speed or security features?
+  </Step>
+
+  <Step title="Review the Plan">
+    Prometheus generates a detailed plan with:
+    - Scope and assumptions
+    - Task breakdown
+    - Dependencies and order
+    - Verification criteria
+  </Step>
+
+  <Step title="Execute with Atlas">
+    Once you approve the plan, run:
+    ```text
+    /start-work
+    ```
+
+    **Atlas** takes over and orchestrates execution across specialized subagents.
+  </Step>
+</Steps>
+
+<Note>
+**When to use Prometheus:**
+- Multi-day projects
+- Critical production changes
+- Complex refactoring
+- When you need a documented decision trail
+- When ambiguity exists in requirements
+</Note>
+
+## Understanding the Agents
+
+### Sisyphus: Your Main Orchestrator
+
+**Sisyphus** is the agent you'll interact with most. He's named after the Greek myth—rolls the boulder every day, never stops, never gives up.
+
+```text
+# Let Sisyphus handle everything
+ultrawork: Fix all TypeScript errors in src/
+```
+
+Sisyphus will:
+- Run diagnostics to find all errors
+- Prioritize by severity
+- Fix errors in parallel
+- Verify with LSP
+- Keep going until error count is zero
+
+<Warning>
+**Important:** Sisyphus works best with **Claude Opus 4.6**. Other models will work but may result in degraded performance.
+</Warning>
+
+### Hephaestus: The Deep Worker
+
+**Hephaestus** runs on GPT-5.3 Codex and handles autonomous deep work. You give him goals, not recipes.
+
+```text
+# Explicitly delegate to Hephaestus
+@hephaestus Implement a caching layer for our API
+```
+
+Hephaestus will:
+- Research caching strategies
+- Evaluate Redis vs in-memory options
+- Implement the solution
+- Add tests and documentation
+- Verify performance
+
+Use Hephaestus for:
+- Complex architectural work
+- Cross-domain knowledge synthesis
+- Deep debugging across many files
+- Research-heavy tasks
+
+### Oracle: The Consultant
+
+**Oracle** is your read-only high-IQ consultant. Use him for architecture decisions and complex debugging.
+
+```text
+@oracle Should we use GraphQL or REST for our new microservice?
+```
+
+Oracle will:
+- Analyze your current architecture
+- Consider team expertise and tooling
+- Evaluate tradeoffs
+- Provide a recommendation with reasoning
+
+**Oracle doesn't write code.** He advises. Then you execute (or let Sisyphus execute).
+
+### Librarian: Documentation Search
+
+**Librarian** searches docs and OSS code to stay current on library APIs and best practices.
+
+```text
+@librarian How do I use Prisma's middleware feature?
+```
+
+Librarian will:
+- Search official Prisma docs
+- Find relevant code examples
+- Explain the API
+- Show usage patterns
+
+### Explore: Fast Codebase Grep
+
+**Explore** uses speed-focused models for pattern discovery across your codebase.
+
+```text
+@explore Find all files that import our deprecated auth module
+```
+
+Explore will:
+- Use AST-aware search
+- Return matching files with context
+- Highlight specific lines
+- Do it fast (uses Grok Code Fast 1 or MiniMax)
+
+## Common Tasks
+
+### Fixing Bugs
+
+<CodeGroup>
+```text Ultrawork
+ultrawork: The login endpoint returns 500 when password is empty
+```
+
+```text With Context
+ultrawork: Users report app crashes on iOS 15. The error is in UserProfile.tsx line 42.
+```
+</CodeGroup>
+
+The agent will:
+1. Locate the bug
+2. Understand the cause
+3. Implement a fix
+4. Add tests to prevent regression
+5. Verify with LSP diagnostics
+
+### Refactoring Code
+
+<CodeGroup>
+```text Simple Refactor
+ultrawork: Extract the user validation logic into a separate service
+```
+
+```text Large Refactor
+@plan "Migrate from Redux to Zustand for state management"
+/start-work
+```
+</CodeGroup>
+
+For large refactors:
+- Use **Prometheus** for planning
+- Let **Atlas** orchestrate execution
+- Agents work in parallel on independent modules
+
+### Adding Features
+
+<CodeGroup>
+```text Feature Request
+ultrawork: Add dark mode support with a toggle in settings
+```
+
+```text Detailed Feature
+ultrawork: Implement real-time notifications using WebSockets.
+Users should see a badge count and a popup list.
+```
+</CodeGroup>
+
+The agent will:
+1. Research your UI framework
+2. Check for existing theme systems
+3. Implement dark mode styles
+4. Add the settings toggle
+5. Persist user preference
+6. Test in both modes
+
+### Writing Tests
+
+<CodeGroup>
+```text Add Tests
+ultrawork: Write unit tests for src/auth/jwt.ts
+```
+
+```text Test Coverage
+ultrawork: Add tests until coverage is above 80%
+```
+</CodeGroup>
+
+The agent will:
+- Analyze the code structure
+- Write comprehensive test cases
+- Cover edge cases
+- Run tests to verify they pass
+
+## Special Commands
+
+### Ralph Loop
+
+The **Ralph Loop** is a self-referential loop that doesn't stop until 100% done.
+
+```text
+/ulw-loop: Optimize all database queries for performance
+```
+
+The agent will:
+- Profile current performance
+- Identify slow queries
+- Optimize one by one
+- Re-profile after each change
+- Keep iterating until benchmarks are met
+- Never stop until complete
+
+### Init Deep
+
+Generate hierarchical `AGENTS.md` files throughout your project for better context:
+
+```text
+/init-deep
+```
+
+This creates:
+```
+project/
+├── AGENTS.md              ← project-wide context
+├── src/
+│   ├── AGENTS.md          ← src-specific context
+│   └── components/
+│       └── AGENTS.md      ← component-specific context
+```
+
+Agents automatically read relevant context. Zero manual management.
+
+### Background Agents
+
+Fire multiple agents in parallel:
+
+```text
+ultrawork: Research React 19 features [background]
+ultrawork: Audit our dependencies for security issues [background]
+ultrawork: Generate API documentation from JSDoc comments [background]
+```
+
+All three run simultaneously. Results arrive when ready.
+
+## Working with Skills
+
+Skills are specialized workflows with embedded MCP servers.
+
+### Playwright Skill
+
+Browser automation:
+
+```text
+/playwright: Test the checkout flow end-to-end
+```
+
+The agent will:
+- Launch a browser
+- Navigate through your app
+- Fill forms and click buttons
+- Capture screenshots
+- Report any failures
+
+### Git Master Skill
+
+Advanced git operations:
+
+```text
+/git-master: Create atomic commits for all changes
+```
+
+The agent will:
+- Analyze uncommitted changes
+- Group by logical units
+- Create separate commits
+- Write meaningful commit messages
+
+## Tips for Better Results
 
 <CardGroup cols={2}>
+  <Card title="Be Specific" icon="bullseye">
+    Instead of "fix the bug", say "fix the login bug where empty passwords return 500".
+  </Card>
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+  <Card title="Use Context" icon="memo">
+    Mention file names, line numbers, or error messages when available.
+  </Card>
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+  <Card title="Trust Ultrawork" icon="wand-magic-sparkles">
+    Let the agent explore and research. You don't need to provide step-by-step instructions.
+  </Card>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+  <Card title="Plan Big Changes" icon="map">
+    For large refactors or multi-day work, use Prometheus mode to plan first.
+  </Card>
+</CardGroup>
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+## Understanding Output
 
+### Hash-Anchored Edits
+
+When the agent reads your files, you'll see content like:
+
+```python
+11#VK| function hello() {
+22#XJ|   return "world";
+33#MB| }
+```
+
+The `#VK`, `#XJ`, `#MB` are content hashes. They ensure edits are applied to the correct lines even if the file changed.
+
+This is why Oh My OpenAgent has a 10x higher success rate on edit operations.
+
+### Background Task Updates
+
+When background agents complete, you'll see notifications:
+
+```text
+[Background: Research React 19] ✓ Complete
+Key findings:
+- New server actions API
+- Automatic memo optimization
+- Suspense improvements
+```
+
+## Next Steps
+
+Now that you know the basics, explore deeper:
+
+<CardGroup cols={2}>
+  <Card title="Orchestration Guide" icon="diagram-project" href="/concepts/orchestration">
+    Learn how agents collaborate and delegate
+  </Card>
+
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Customize agent models and behavior
+  </Card>
+
+  <Card title="Features Reference" icon="book" href="/features/discipline-agents">
+    Explore all 46 hooks and 26 tools
+  </Card>
+
+  <Card title="Manifesto" icon="scroll" href="/community/manifesto">
+    Understand the philosophy behind Oh My OpenAgent
+  </Card>
+</CardGroup>
+
+## Need Help?
+
+<CardGroup cols={2}>
+  <Card title="Discord Community" icon="discord" href="https://discord.gg/PUwSMR9XNk">
+    Ask questions and share your experience
+  </Card>
+
+  <Card title="GitHub Issues" icon="github" href="https://github.com/code-yeongyu/oh-my-openagent/issues">
+    Report bugs or request features
+  </Card>
+
+  <Card title="Doctor Command" icon="stethoscope">
+    Run `bunx oh-my-opencode doctor` to diagnose issues
+  </Card>
+
+  <Card title="Logs" icon="file-lines">
+    Check `/tmp/oh-my-opencode.log` for debugging
+  </Card>
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+**Remember:** The best way to learn is by doing. Start with `ultrawork` and see where it takes you.
+
+You'll be amazed at what a coordinated AI team can accomplish.
 </Note>

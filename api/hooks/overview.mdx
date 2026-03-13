@@ -1,0 +1,301 @@
+---
+title: Hooks Overview
+description: Complete guide to the 46 lifecycle hooks in Oh My OpenAgent
+---
+
+## Overview
+
+Oh My OpenAgent provides 46 lifecycle hooks across 5 tiers, enabling deep customization of agent behavior, tool execution, session management, and message transformation.
+
+## Hook Tiers
+
+Hooks are organized into 5 functional tiers:
+
+### Tier 1: Session Hooks (24 hooks)
+
+Manage session lifecycle, context window, model selection, and agent behavior.
+
+**Key hooks:**
+- `context-window-monitor` - Track context window usage
+- `think-mode` - Dynamic thinking budget
+- `model-fallback` - Provider-level model fallback
+- `anthropic-context-window-limit-recovery` - Auto-recover from context limits
+- `atlas` - Master boulder orchestrator
+- `ralph-loop` - Self-referential dev loop
+
+[View Session Hooks →](/api/hooks/session-hooks)
+
+### Tier 2: Tool Guard Hooks (11 hooks)
+
+Control tool execution, validate inputs, enhance outputs.
+
+**Key hooks:**
+- `comment-checker` - Block AI-generated comment patterns
+- `write-existing-file-guard` - Require Read before Write
+- `hashline-read-enhancer` - Add LINE#ID hashes to Read output
+- `json-error-recovery` - Detect and correct JSON parse errors
+- `rules-injector` - Conditional rules injection
+
+[View Tool Guard Hooks →](/api/hooks/tool-guard-hooks)
+
+### Tier 3: Transform Hooks (4 hooks)
+
+Transform messages and inject context.
+
+**Key hooks:**
+- `claude-code-hooks` - Claude Code compatibility
+- `keyword-detector` - Detect ultrawork/search/analyze modes
+- `thinking-block-validator` - Validate thinking block structure
+
+[View Transform Hooks →](/api/hooks/transform-hooks)
+
+### Tier 4: Continuation Hooks (7 hooks)
+
+Force continuation when work is incomplete ("boulder" mechanism).
+
+**Key hooks:**
+- `todo-continuation-enforcer` - Force continuation on incomplete todos
+- `atlas` - Boulder orchestrator for subagent sessions
+- `stop-continuation-guard` - Handle `/stop-continuation` command
+
+[View Continuation Hooks →](/api/hooks/continuation-hooks)
+
+### Tier 5: Skill Hooks (2 hooks)
+
+Skill and command detection.
+
+**Key hooks:**
+- `category-skill-reminder` - Remind about category+skill delegation
+- `auto-slash-command` - Auto-detect `/command` patterns
+
+## Hook Lifecycle
+
+Hooks execute at different points in the agent lifecycle:
+
+### Session Events
+
+```
+session.created → session.idle → session.error → session.deleted
+```
+
+**Hooks:**
+- `session.created`: `auto-update-checker`, `interactive-bash-session`
+- `session.idle`: `context-window-monitor`, `todo-continuation-enforcer`, `atlas`
+- `session.error`: `session-recovery`, `anthropic-context-window-limit-recovery`
+- `session.deleted`: cleanup hooks
+
+### Tool Execution
+
+```
+tool.execute.before → [tool executes] → tool.execute.after
+```
+
+**Hooks:**
+- `tool.execute.before`: `write-existing-file-guard`, `rules-injector`, `prometheus-md-only`
+- `tool.execute.after`: `comment-checker`, `tool-output-truncator`, `hashline-read-enhancer`
+
+### Message Processing
+
+```
+user message → chat.message → messages.transform → chat.params → [LLM call]
+```
+
+**Hooks:**
+- `chat.message`: `non-interactive-env`, `keyword-detector`, `auto-slash-command`
+- `messages.transform`: `context-injector`, `thinking-block-validator`
+- `chat.params`: `think-mode`, `anthropic-effort`
+
+## How to Disable Hooks
+
+Disable specific hooks in configuration:
+
+```json
+{
+  "disabled_hooks": [
+    "todo-continuation-enforcer",
+    "comment-checker",
+    "auto-update-checker"
+  ]
+}
+```
+
+Disable hook categories:
+
+```json
+{
+  "disabled_hooks": [
+    "session-*",        // All session hooks
+    "tool-guard-*",     // All tool guard hooks
+    "continuation-*"    // All continuation hooks
+  ]
+}
+```
+
+## Hook Configuration
+
+Many hooks support configuration:
+
+### Context Window Monitor
+
+```json
+{
+  "experimental": {
+    "preemptive_compaction": true  // Enable preemptive compaction
+  }
+}
+```
+
+### Model Fallback
+
+```json
+{
+  "model_fallback": true,  // Enable provider-level fallback
+  "experimental": {
+    "model_fallback_title": true  // Update session title on fallback
+  }
+}
+```
+
+### Todo Continuation Enforcer
+
+```json
+{
+  "boulder": {
+    "enabled": true,
+    "cooldown_ms": 30000,          // 30s between continuations
+    "max_consecutive_failures": 5  // Max failures before pause
+  }
+}
+```
+
+### Ralph Loop
+
+```json
+{
+  "ralph_loop": {
+    "max_iterations": 100,  // Max iterations per loop
+    "completion_promise": "<promise>DONE</promise>"
+  }
+}
+```
+
+### Comment Checker
+
+```json
+{
+  "comment_checker": {
+    "enabled": true,
+    "strict_mode": false  // Strict pattern matching
+  }
+}
+```
+
+## Hook Factory Pattern
+
+All hooks follow the factory pattern:
+
+```typescript
+export function createXXXHook(
+  ctx: PluginInput,
+  options?: HookOptions
+): HookFunction {
+  return async (event, context) => {
+    // Hook implementation
+  }
+}
+```
+
+## Hook Composition
+
+Hooks are composed in three tiers:
+
+```typescript
+// src/plugin/hooks/create-core-hooks.ts
+export function createCoreHooks(args) {
+  const sessionHooks = createSessionHooks(args)      // 24 hooks
+  const toolGuardHooks = createToolGuardHooks(args)  // 11 hooks
+  const transformHooks = createTransformHooks(args)  // 4 hooks
+  
+  return { ...sessionHooks, ...toolGuardHooks, ...transformHooks }
+}
+
+// src/plugin/hooks/create-continuation-hooks.ts
+export function createContinuationHooks(args) {
+  // 7 continuation hooks
+}
+
+// src/plugin/hooks/create-skill-hooks.ts
+export function createSkillHooks(args) {
+  // 2 skill hooks
+}
+```
+
+## Adding New Hooks
+
+To add a new hook:
+
+1. Create `src/hooks/{name}/index.ts` with `createXXXHook(deps)` factory
+2. Register in appropriate tier file:
+   - `src/plugin/hooks/create-session-hooks.ts` (session lifecycle)
+   - `src/plugin/hooks/create-tool-guard-hooks.ts` (tool execution)
+   - `src/plugin/hooks/create-transform-hooks.ts` (message transform)
+   - `src/plugin/hooks/create-continuation-hooks.ts` (continuation)
+   - `src/plugin/hooks/create-skill-hooks.ts` (skill/command)
+3. Add hook name to `src/config/schema/hooks.ts` HookNameSchema
+4. Hook receives `(event, ctx)` — return value depends on event type
+
+## Hook Events
+
+Hooks respond to these OpenCode events:
+
+- `session.created` - New session started
+- `session.idle` - Agent finished processing
+- `session.error` - Error occurred
+- `session.deleted` - Session closed
+- `session.compacted` - Context window compacted
+- `tool.execute.before` - Before tool execution
+- `tool.execute.after` - After tool execution
+- `chat.message` - New user message
+- `chat.params` - Before LLM call (modify params)
+- `chat.headers` - Before LLM call (modify headers)
+- `messages.transform` - Transform message array
+- `event` - Generic event (any of the above)
+
+## Complex Hooks
+
+### anthropic-context-window-limit-recovery
+
+31 files, ~2232 LOC. Multi-strategy recovery:
+- Truncation (remove old messages)
+- Compaction (summarize middle)
+- Summarization (condense context)
+
+### atlas
+
+17 files, ~1976 LOC. Master orchestrator:
+- Decision gates for continuation
+- Session type detection
+- Tool policy enforcement
+- Verification reminders
+
+### ralph-loop
+
+14 files, ~1687 LOC. Self-referential dev loop:
+- Iterates until `<promise>DONE</promise>`
+- State persisted to `.sisyphus/ralph-loop.local.md`
+- Max 100 iterations (configurable)
+
+### todo-continuation-enforcer
+
+13 files, ~2061 LOC. "Boulder" mechanism:
+- Forces continuation on incomplete todos
+- 2s countdown toast before injection
+- Exponential backoff on failures
+
+## Related Documentation
+
+- [Session Hooks](/api/hooks/session-hooks) - Session lifecycle management
+- [Tool Guard Hooks](/api/hooks/tool-guard-hooks) - Tool execution control
+- [Transform Hooks](/api/hooks/transform-hooks) - Message transformation
+- [Continuation Hooks](/api/hooks/continuation-hooks) - Boulder mechanism
+- [Tools Overview](/api/tools/overview) - Available tools

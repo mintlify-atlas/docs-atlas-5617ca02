@@ -1,0 +1,420 @@
+---
+title: Tool Guard Hooks
+description: Hooks for controlling tool execution, validating inputs, and enhancing outputs
+---
+
+## Overview
+
+Tool Guard hooks (11 total) control tool execution by validating inputs before execution and enhancing outputs after execution. These hooks execute on `tool.execute.before` and `tool.execute.after` events.
+
+## Pre-Execution Guards
+
+### write-existing-file-guard
+
+Requires Read before Write for existing files.
+
+**When it executes:** `tool.execute.before` (Write tool)
+
+**What it does:**
+- Checks if file exists
+- Verifies Read tool was called for this file
+- Blocks Write if file not read first
+- Shows error with suggestion
+
+**Example Error:**
+```
+Error: Cannot write to existing file without reading it first.
+Please use the Read tool to read src/app.ts before writing.
+```
+
+**Configuration:**
+```json
+{
+  "experimental": {
+    "write_existing_file_guard": true
+  }
+}
+```
+
+### prometheus-md-only
+
+Enforces .md-only writes for Prometheus agent.
+
+**When it executes:** `tool.execute.before` (Write tool)
+
+**What it does:**
+- Detects Prometheus agent (planner)
+- Blocks writes to non-.md files
+- Allows `.md`, `.txt`, `.json` only
+- Shows error message
+
+**Example Error:**
+```
+Error: Prometheus agent can only write .md files.
+Attempted: src/app.ts
+Allowed: .md, .txt, .json
+```
+
+### rules-injector
+
+Injects conditional rules based on context.
+
+**When it executes:** `tool.execute.before`
+
+**What it does:**
+- Evaluates rule conditions from AGENTS.md
+- Injects matching rules into system prompt
+- Supports conditions: file type, agent, tool, path patterns
+- Loads rules from config and skill metadata
+
+**Rule Format:**
+```markdown
+## Rules
+
+<!-- condition: file=*.ts -->
+- Always use strict TypeScript
+- Enable all compiler checks
+
+<!-- condition: tool=Write -->
+- Add file headers to new files
+- Follow project formatting style
+```
+
+**Configuration:**
+```json
+{
+  "rules_injector": {
+    "enabled": true,
+    "sources": ["agents.md", "config", "skills"]
+  }
+}
+```
+
+### tasks-todowrite-disabler
+
+Disables TodoWrite when task system is active.
+
+**When it executes:** `tool.execute.before` (TodoWrite)
+
+**What it does:**
+- Detects active task system usage
+- Blocks TodoWrite tool calls
+- Shows message suggesting task tools instead
+- Prevents conflicts between todo and task systems
+
+**Example Error:**
+```
+Error: TodoWrite is disabled when task system is active.
+Use task_create, task_update instead.
+```
+
+**Configuration:**
+```json
+{
+  "experimental": {
+    "disable_todowrite_with_tasks": true
+  }
+}
+```
+
+## Post-Execution Enhancers
+
+### comment-checker
+
+Blocks AI-generated comment patterns ("AI slop").
+
+**When it executes:** `tool.execute.after` (Edit, Write)
+
+**What it does:**
+- Scans output for AI-generated comment patterns
+- Detects phrases like "Note:", "Important:", "Remember:"
+- Blocks execution if patterns found
+- Shows error with matched patterns
+
+**Blocked Patterns:**
+- `// Note: ...`
+- `// Important: ...`
+- `// TODO: Remember to ...`
+- `// Reminder: ...`
+- `/* This is a placeholder */`
+
+**Example Error:**
+```
+Error: AI-generated comment pattern detected.
+
+Matched patterns:
+- "// Note: This is important"
+- "// Remember: Add tests"
+
+Please remove these comments and try again.
+```
+
+**Configuration:**
+```json
+{
+  "comment_checker": {
+    "enabled": true,
+    "strict_mode": false,  // More aggressive pattern matching
+    "custom_patterns": ["// FIXME: AI generated"]
+  }
+}
+```
+
+### tool-output-truncator
+
+Truncates oversized tool output.
+
+**When it executes:** `tool.execute.after`
+
+**What it does:**
+- Measures tool output size in tokens
+- Truncates if exceeds limits (2000 lines or 51200 bytes)
+- Preserves first/last portions
+- Adds truncation notice
+- Writes full output to temp file
+
+**Truncation Format:**
+```
+[First 1000 lines]
+...
+--- OUTPUT TRUNCATED (12000 lines total) ---
+Full output saved to: /tmp/tool-output-abc123.txt
+...
+[Last 1000 lines]
+```
+
+**Configuration:**
+```json
+{
+  "experimental": {
+    "tool_output_truncator": {
+      "max_lines": 2000,
+      "max_bytes": 51200
+    }
+  }
+}
+```
+
+### hashline-read-enhancer
+
+Adds LINE#ID hashes to Read tool output.
+
+**When it executes:** `tool.execute.after` (Read tool)
+
+**What it does:**
+- Computes hash for each line
+- Formats output as `LINE#ID| content`
+- Enables hash-anchored editing
+- Only active when hashline_edit enabled
+
+**Output Format:**
+```
+1#ZP| import { foo } from './bar'
+2#MQ| 
+3#VK| export function hello() {
+4#WT|   return 'world'
+5#BY| }
+```
+
+**Configuration:**
+```json
+{
+  "hashline_edit": true  // Enables hashline-read-enhancer
+}
+```
+
+### json-error-recovery
+
+Detects JSON parse errors and injects correction reminder.
+
+**When it executes:** `tool.execute.after`
+
+**What it does:**
+- Detects JSON parse errors in tool output
+- Identifies error patterns (missing comma, trailing comma, quotes)
+- Injects correction reminder into context
+- Shows specific fix suggestions
+
+**Detected Patterns:**
+- `Unexpected token` → Missing/extra comma
+- `Unterminated string` → Missing quote
+- `Expected property name` → Missing key quotes
+- `Trailing comma` → Remove last comma
+
+**Example Reminder:**
+```
+JSON Error Detected:
+
+Error: Unexpected token '}' at position 45
+
+Common fixes:
+1. Add missing comma after property
+2. Remove trailing comma before }
+3. Quote all property names
+4. Escape quotes in string values
+
+Invalid JSON:
+{
+  "name": "test"
+  "value": 42  // ← Missing comma
+}
+
+Fixed:
+{
+  "name": "test",
+  "value": 42
+}
+```
+
+**Excluded Tools:**
+```typescript
+JSON_ERROR_TOOL_EXCLUDE_LIST = [
+  "grep", "glob", "ast_grep_search",  // Output not JSON
+  "bash", "interactive_bash"          // Output not controlled
+]
+```
+
+**Configuration:**
+```json
+{
+  "json_error_recovery": {
+    "enabled": true,
+    "exclude_tools": ["custom_tool"]
+  }
+}
+```
+
+### read-image-resizer
+
+Resizes images for efficient context usage.
+
+**When it executes:** `tool.execute.after` (Read tool, for images)
+
+**What it does:**
+- Detects image files (.png, .jpg, .gif, .webp)
+- Resizes large images (>1MB)
+- Converts to optimal format (WebP)
+- Maintains aspect ratio
+- Reduces token usage
+
+**Resize Thresholds:**
+- Max width: 1920px
+- Max height: 1080px
+- Max file size: 1MB
+- Target format: WebP (90% quality)
+
+**Configuration:**
+```json
+{
+  "experimental": {
+    "read_image_resizer": {
+      "max_width": 1920,
+      "max_height": 1080,
+      "quality": 90
+    }
+  }
+}
+```
+
+## Context Injection Guards
+
+### directory-agents-injector
+
+Auto-injects AGENTS.md from current directory.
+
+**When it executes:** `tool.execute.before`
+
+**What it does:**
+- Checks for AGENTS.md in current directory
+- Injects content into system prompt
+- Respects token budget
+- Caches injected content
+- Auto-disabled when OpenCode has native support
+
+**Configuration:**
+```json
+{
+  "directory_agents_injector": {
+    "enabled": true,
+    "max_tokens": 10000
+  }
+}
+```
+
+### directory-readme-injector
+
+Auto-injects README.md from current directory.
+
+**When it executes:** `tool.execute.before`
+
+**What it does:**
+- Checks for README.md in current directory
+- Injects content into system prompt
+- Respects token budget
+- Caches injected content
+
+**Configuration:**
+```json
+{
+  "directory_readme_injector": {
+    "enabled": true,
+    "max_tokens": 5000
+  }
+}
+```
+
+### empty-task-response-detector
+
+Detects empty/failed task responses.
+
+**When it executes:** `tool.execute.after` (task, call_omo_agent)
+
+**What it does:**
+- Checks task result for empty content
+- Detects "No output" / "Task failed" patterns
+- Injects error context
+- Suggests retry with different params
+
+**Example Detection:**
+```
+Warning: Task returned empty response.
+
+Possible causes:
+1. Task prompt was too vague
+2. Model timed out
+3. Background task was cancelled
+
+Suggestions:
+- Retry with more specific prompt
+- Check background_output for details
+- Try different category/model
+```
+
+## Disabling Tool Guard Hooks
+
+Disable specific hooks:
+
+```json
+{
+  "disabled_hooks": [
+    "comment-checker",
+    "write-existing-file-guard",
+    "tool-output-truncator"
+  ]
+}
+```
+
+Disable all tool guard hooks:
+
+```json
+{
+  "disabled_hooks": ["tool-guard-*"]
+}
+```
+
+## Related Documentation
+
+- [Hooks Overview](/api/hooks/overview)
+- [Session Hooks](/api/hooks/session-hooks)
+- [Transform Hooks](/api/hooks/transform-hooks)
+- [Tools Overview](/api/tools/overview)

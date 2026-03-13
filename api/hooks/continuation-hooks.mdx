@@ -1,0 +1,436 @@
+---
+title: Continuation Hooks
+description: Hooks for enforcing work completion (boulder mechanism)
+---
+
+## Overview
+
+Continuation hooks (7 total) implement the "boulder" mechanism — forcing agents to continue when work is incomplete. These hooks monitor session state and inject continuation prompts to prevent premature stopping.
+
+## The Boulder Mechanism
+
+**Boulder** = Forcing Sisyphus to keep rolling the stone uphill when todos remain incomplete.
+
+**Key Concept:** If the agent stops with incomplete work, the boulder hook detects this and forces continuation by injecting a prompt like:
+
+```
+⚠️ IMPORTANT: Incomplete todos detected.
+
+You must continue working until all todos are marked complete.
+Do not stop until the work is finished.
+```
+
+## Core Continuation Hooks
+
+### todo-continuation-enforcer
+
+The main "boulder" — forces continuation on incomplete todos.
+
+**When it executes:** `session.idle`
+
+**What it does:**
+1. Checks if session is main Sisyphus session (not prometheus/compaction)
+2. Detects incomplete todos via session storage
+3. Checks if continuation is stopped (via `/stop-continuation`)
+4. Waits for cooldown period (30s default)
+5. Shows 2s countdown toast
+6. Injects continuation prompt
+
+**Decision Gate:**
+```
+session.idle
+  → Is main session? (skip prometheus, compaction)
+  → No abort detected? (ABORT_WINDOW_MS = 3s)
+  → Todos incomplete?
+  → No background tasks running?
+  → Cooldown passed? (30s)
+  → Failure count < max? (5)
+  → START COUNTDOWN → INJECT PROMPT
+```
+
+**State Tracking:**
+```typescript
+interface SessionState {
+  failureCount: number       // Consecutive failures
+  lastFailureAt?: number     // Timestamp
+  abortDetectedAt?: number   // Reset after ABORT_WINDOW_MS
+  cooldownUntil?: number     // Next injection allowed after
+  countdownTimer?: Timer     // Active countdown reference
+}
+```
+
+**Constants:**
+```typescript
+CONTINUATION_COOLDOWN_MS = 30_000        // 30s between injections
+MAX_CONSECUTIVE_FAILURES = 5              // Then 5min pause
+FAILURE_RESET_WINDOW_MS = 5 * 60_000     // 5min window
+COUNTDOWN_SECONDS = 2                     // Countdown duration
+ABORT_WINDOW_MS = 3000                    // Grace after abort
+```
+
+**Configuration:**
+```json
+{
+  "boulder": {
+    "enabled": true,
+    "cooldown_ms": 30000,
+    "max_consecutive_failures": 5,
+    "countdown_seconds": 2
+  }
+}
+```
+
+**Countdown Toast:**
+```
+⏱️ Continuing in 2 seconds...
+
+Reason: 3 incomplete todos
+
+Press Ctrl+C to cancel
+```
+
+**Injected Prompt:**
+```
+⚠️ CONTINUATION REQUIRED
+
+You have stopped with incomplete work:
+- [ ] Fix authentication bug
+- [ ] Add unit tests
+- [ ] Update documentation
+
+You MUST continue working until all todos are complete.
+Do not stop until the work is finished.
+```
+
+### atlas
+
+Master orchestrator for boulder/ralph/subagent sessions.
+
+**When it executes:** `session.idle`
+
+**What it does:**
+- Monitors boulder, ralph-loop, and task-spawned agent sessions
+- Enforces write/edit policies for session types
+- Injects verification reminders after tool execution
+- Forces continuation when work incomplete
+
+**Decision Gate:**
+```
+session.idle
+  → Is boulder/ralph/atlas session?
+  → No abort signal?
+  → Failure count < max?
+  → No running background tasks?
+  → Agent matches expected?
+  → Plan incomplete?
+  → Cooldown passed? (5s)
+  → INJECT CONTINUATION
+```
+
+**Session Types:**
+- **Boulder:** Main work sessions started with `/start-work`
+- **Ralph:** Self-referential dev loop sessions
+- **Atlas:** Task-spawned agent sessions
+- **Subagent:** Background delegated tasks
+
+**Write/Edit Policy:**
+```typescript
+// Prometheus: .md files only
+if (agent === "prometheus" && !file.endsWith(".md")) {
+  throw new Error("Prometheus can only write .md files")
+}
+
+// Git Master: no direct file writes
+if (agent === "git-master" && tool === "Write") {
+  throw new Error("Git Master cannot write files directly")
+}
+```
+
+**Verification Reminders:**
+```
+✓ Tool execution completed: Read src/auth.ts
+
+Reminder: Verify the file content before proceeding.
+Does the code match your expectations?
+```
+
+**Configuration:**
+```json
+{
+  "atlas": {
+    "enabled": true,
+    "cooldown_ms": 5000,
+    "verification_reminders": true,
+    "agent_overrides": {
+      "prometheus": {
+        "allow_non_md_writes": false
+      }
+    }
+  }
+}
+```
+
+### gpt-permission-continuation
+
+Handles GPT model permission prompts during continuation.
+
+**When it executes:** `session.idle`
+
+**What it does:**
+- Detects GPT model permission prompts (OAuth, API key)
+- Pauses continuation enforcement
+- Allows user to grant permissions
+- Resumes continuation after permission granted
+
+**Detection:**
+```
+User action required:
+GPT model requires API key. Please visit:
+https://platform.openai.com/api-keys
+```
+
+**Behavior:**
+- Pauses todo-continuation-enforcer
+- Shows permission prompt
+- Waits for user action
+- Resumes after 60s timeout or user action
+
+## Support Hooks
+
+### stop-continuation-guard
+
+Handles `/stop-continuation` command.
+
+**When it executes:** `chat.message`
+
+**What it does:**
+- Detects `/stop-continuation` in user message
+- Marks session as "stopped" in state
+- Blocks todo-continuation-enforcer for this session
+- Shows confirmation toast
+- Cancels any pending background tasks
+
+**Usage:**
+```
+/stop-continuation
+```
+
+**Response:**
+```
+✓ Continuation stopped for this session.
+
+You can now end the session without forced continuation.
+Background tasks will be cancelled.
+```
+
+**Configuration:**
+```json
+{
+  "stop_continuation_guard": {
+    "enabled": true,
+    "cancel_background_tasks": true
+  }
+}
+```
+
+### compaction-context-injector
+
+Re-injects context after compaction.
+
+**When it executes:** `session.compacted`
+
+**What it does:**
+- Detects when context window was compacted
+- Re-injects AGENTS.md, README.md
+- Re-injects active task/boulder context
+- Ensures agent doesn't lose important context
+
+**Injected Content:**
+```xml
+<system_reminder after_compaction="true">
+Context was compacted. Here's what you need to remember:
+
+- Current task: Fix authentication bug
+- Incomplete todos: 3
+- Files modified: src/auth.ts, src/middleware.ts
+
+Continue from where you left off.
+</system_reminder>
+```
+
+### compaction-todo-preserver
+
+Preserves todos through compaction.
+
+**When it executes:** `session.compacted`
+
+**What it does:**
+- Extracts all todos before compaction
+- Re-injects todos after compaction
+- Prevents todo loss during summarization
+- Maintains todo completion state
+
+**Preserved Format:**
+```markdown
+## Preserved Todos
+
+☐ Fix authentication bug
+☐ Add unit tests for auth flow
+☑ Read authentication code
+☑ Identify the bug
+☐ Update documentation
+```
+
+### unstable-agent-babysitter
+
+Monitors unstable agent behavior.
+
+**When it executes:** `session.idle`
+
+**What it does:**
+- Tracks agent behavior patterns
+- Detects repeated failures, infinite loops, stuck states
+- Injects corrective prompts
+- Escalates to human if needed
+
+**Detected Behaviors:**
+- **Infinite loop:** Same action repeated 5+ times
+- **Stuck:** No progress for 10+ continuations
+- **Repeated failure:** Same error 3+ times
+- **Resource abuse:** Excessive tool calls
+
+**Intervention:**
+```
+⚠️ UNSTABLE BEHAVIOR DETECTED
+
+You have been stuck in a loop for 5 iterations.
+
+You keep trying: Read src/auth.ts
+Result: File not found
+
+You must try a different approach.
+Consider:
+1. Check if file path is correct
+2. Use glob to find the file
+3. Ask user for clarification
+```
+
+### background-notification-hook
+
+Notifies when background tasks complete.
+
+**When it executes:** `event` (background task completion)
+
+**What it does:**
+- Monitors background task status
+- Sends OS notification on completion
+- Plays sound (optional)
+- Shows terminal toast
+
+**Notification:**
+```
+✓ Background task completed
+
+Task: Analyze codebase
+Duration: 2m 15s
+Status: Success
+```
+
+**Configuration:**
+```json
+{
+  "background_notification": {
+    "enabled": true,
+    "sound": true,
+    "show_toast": true
+  }
+}
+```
+
+## Boulder vs Atlas
+
+**todo-continuation-enforcer** (Boulder):
+- Targets: Main Sisyphus sessions
+- Trigger: Incomplete todos
+- Cooldown: 30s
+- Max failures: 5
+
+**atlas** (Master Orchestrator):
+- Targets: Boulder, ralph, subagent sessions
+- Trigger: Incomplete plan + idle
+- Cooldown: 5s
+- Additional: Write/edit policy enforcement
+
+## Failure Handling
+
+### Exponential Backoff
+
+```
+Failure 1: Wait 30s
+Failure 2: Wait 60s (30s × 2)
+Failure 3: Wait 120s (60s × 2)
+Failure 4: Wait 240s (120s × 2)
+Failure 5: Wait 300s (5 minutes, max)
+
+After 5 failures: Pause for 5 minutes, then reset
+```
+
+### Failure Reset
+
+Failure count resets if:
+- No failures for 5 minutes
+- Successful continuation occurs
+- User sends new message
+
+## Common Patterns
+
+### Start Boulder Session
+
+```bash
+/start-work
+```
+
+Agent loads task from `.sisyphus/current.md` and starts boulder session.
+
+### Stop Boulder Manually
+
+```bash
+/stop-continuation
+```
+
+Disables boulder for current session.
+
+### Resume After Abort
+
+If agent aborts (Ctrl+C):
+- Boulder pauses for 3s (ABORT_WINDOW_MS)
+- Resumes after grace period
+- Continues enforcing on next idle
+
+## Disabling Continuation Hooks
+
+Disable specific hooks:
+
+```json
+{
+  "disabled_hooks": [
+    "todo-continuation-enforcer",
+    "atlas"
+  ]
+}
+```
+
+Disable all continuation hooks:
+
+```json
+{
+  "disabled_hooks": ["continuation-*"]
+}
+```
+
+## Related Documentation
+
+- [Hooks Overview](/api/hooks/overview)
+- [Session Hooks](/api/hooks/session-hooks)
+- [Tool Guard Hooks](/api/hooks/tool-guard-hooks)
+- [Transform Hooks](/api/hooks/transform-hooks)

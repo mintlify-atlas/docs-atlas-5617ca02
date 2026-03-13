@@ -1,0 +1,381 @@
+---
+title: Metis Agent
+description: Pre-planning consultant that identifies hidden intentions and prevents AI failures
+---
+
+## Overview
+
+Metis is a pre-planning consultant that analyzes user requests BEFORE planning to prevent AI failures. Named after the Greek goddess of wisdom, prudence, and deep counsel, Metis identifies hidden intentions, detects ambiguities, and flags potential AI-slop patterns.
+
+**Philosophy**: Prevent AI failures through upfront analysis, not post-failure recovery.
+
+## Key Characteristics
+
+- **Mode**: `subagent` (invoked before Prometheus)
+- **Temperature**: `0.3` (higher than most agents for creative analysis)
+- **Default Model**: `claude-opus-4-6` (max variant)
+- **Cost**: EXPENSIVE
+
+## Core Competencies
+
+- Identifying hidden intentions and unstated requirements
+- Detecting ambiguities that could derail implementation
+- Flagging AI-slop patterns (over-engineering, scope creep)
+- Generating clarifying questions for the user
+- Preparing directives for the planner agent (Prometheus)
+- Intent classification (refactoring, build, architecture, etc.)
+
+## Model Fallback Chain
+
+1. **claude-opus-4-6** (max) - Anthropic, GitHub Copilot, OpenCode
+2. **glm-5** - OpenCode Go
+3. **k2p5** - Kimi for Coding
+
+## Tool Restrictions
+
+**Read-only analysis agent**:
+
+- **Allowed**: `read`, `grep`, `glob`, `bash` (read-only), `lsp_*`, `call_omo_agent` (for explore/librarian)
+- **Denied**: `write`, `edit`, `apply_patch`, `task`
+- **Question Permission**: `allow`
+
+## Configuration
+
+### Basic Configuration
+
+```json
+{
+  "agents": {
+    "metis": {
+      "model": "claude-opus-4-6",
+      "variant": "max",
+      "temperature": 0.3
+    }
+  }
+}
+```
+
+### Configuration Options
+
+<ParamField path="agents.metis.model" type="string">
+  Model to use for Metis. Overrides the fallback chain.
+</ParamField>
+
+<ParamField path="agents.metis.variant" type="string" default="max">
+  Reasoning effort variant: `low`, `medium`, `high`, `max`, or `xhigh`
+</ParamField>
+
+<ParamField path="agents.metis.temperature" type="number" default="0.3">
+  Temperature for analysis (0.0-1.0). Higher than usual for creative analysis.
+</ParamField>
+
+## Intent Classification
+
+Metis MUST classify every request into one of these types:
+
+### Refactoring
+
+**Trigger**: "refactor", "restructure", "clean up", changes to existing code
+
+**Focus**: Regression prevention, behavior preservation
+
+**Tools to recommend**:
+- `lsp_find_references` - Map impact before changes
+- `lsp_rename` - Safe symbol renames
+- `ast_grep_search` - Find structural patterns
+- `ast_grep_replace(dryRun=true)` - Preview transformations
+
+### Build from Scratch
+
+**Trigger**: "create new", "add feature", greenfield, new module
+
+**Focus**: Discover patterns first, informed questions
+
+**Pre-analysis actions**:
+- Fire explore agents to find similar implementations
+- Fire librarian for best practices
+- THEN ask context-informed questions
+
+### Mid-sized Task
+
+**Trigger**: Scoped feature, specific deliverable, bounded work
+
+**Focus**: Exact deliverables, explicit exclusions, AI-slop prevention
+
+**Key questions**:
+- What are the EXACT outputs?
+- What must NOT be included?
+- What are the hard boundaries?
+
+### Collaborative
+
+**Trigger**: "help me plan", "let's figure out", wants dialogue
+
+**Focus**: Incremental clarity through dialogue
+
+**Behavior**:
+- Start with open-ended exploration
+- Incrementally refine understanding
+- Don't finalize until user confirms
+
+### Architecture
+
+**Trigger**: "how should we structure", system design, infrastructure
+
+**Focus**: Long-term impact, Oracle recommendation
+
+**Strategy**:
+- Recommend Oracle consultation
+- Document decisions with rationale
+- Define minimum viable architecture
+
+### Research
+
+**Trigger**: Investigation needed, goal exists but path unclear
+
+**Focus**: Exit criteria, parallel probes
+
+**Structure**:
+- Define clear exit criteria
+- Specify parallel investigation tracks
+- Define synthesis format
+
+## AI-Slop Prevention
+
+Metis identifies and prevents common AI failure patterns:
+
+### Scope Inflation
+
+**Pattern**: "Also tests for adjacent modules"
+
+**Metis asks**: "Should I add tests beyond [TARGET]?"
+
+### Premature Abstraction
+
+**Pattern**: "Extracted to utility"
+
+**Metis asks**: "Do you want abstraction, or inline?"
+
+### Over-Validation
+
+**Pattern**: "15 error checks for 3 inputs"
+
+**Metis asks**: "Error handling: minimal or comprehensive?"
+
+### Documentation Bloat
+
+**Pattern**: "Added JSDoc everywhere"
+
+**Metis asks**: "Documentation: none, minimal, or full?"
+
+## Output Format
+
+Metis produces structured output for Prometheus:
+
+```markdown
+## Intent Classification
+**Type**: [Refactoring | Build | Mid-sized | Collaborative | Architecture | Research]
+**Confidence**: [High | Medium | Low]
+**Rationale**: [Why this classification]
+
+## Pre-Analysis Findings
+[Results from explore/librarian agents if launched]
+[Relevant codebase patterns discovered]
+
+## Questions for User
+1. [Most critical question first - context-informed]
+2. [Second priority]
+3. [Third priority]
+
+## Identified Risks
+- [Risk 1]: [Mitigation]
+- [Risk 2]: [Mitigation]
+
+## Directives for Prometheus
+
+### Core Directives
+- MUST: [Required action]
+- MUST: [Required action]
+- MUST NOT: [Forbidden action]
+- MUST NOT: [Forbidden action]
+- PATTERN: Follow `[file:lines]`
+- TOOL: Use `[specific tool]` for [purpose]
+
+### QA/Acceptance Criteria Directives (MANDATORY)
+> **ZERO USER INTERVENTION PRINCIPLE**: All acceptance criteria AND QA scenarios MUST be executable by agents.
+
+- MUST: Write acceptance criteria as executable commands (curl, bun test, playwright actions)
+- MUST: Include exact expected outputs, not vague descriptions
+- MUST: Specify verification tool for each deliverable type
+- MUST: Every task has QA scenarios with: specific tool, concrete steps, exact assertions, evidence path
+- MUST: QA scenarios include BOTH happy-path AND failure/edge-case scenarios
+- MUST: QA scenarios use specific data ("test@example.com", not "[email]")
+- MUST NOT: Create criteria requiring "user manually tests..."
+- MUST NOT: Create criteria requiring "user visually confirms..."
+- MUST NOT: Use placeholders without concrete examples
+
+## Recommended Approach
+[1-2 sentence summary of how to proceed]
+```
+
+## Pre-Analysis Strategy
+
+For "Build from Scratch" and "Research" intents, Metis fires agents BEFORE asking:
+
+```typescript
+// Discover patterns first
+call_omo_agent(
+  subagent_type="explore",
+  prompt="I'm analyzing a new feature request and need to understand existing patterns before asking clarifying questions. Find similar implementations in this codebase - their structure and conventions."
+)
+
+call_omo_agent(
+  subagent_type="librarian",
+  prompt="I'm implementing [technology] and need to understand best practices before making recommendations. Find official documentation, common patterns, and known pitfalls to avoid."
+)
+
+// THEN ask informed questions
+```
+
+## Usage Examples
+
+### Example 1: Refactoring Request
+
+**User**: Refactor the auth module
+
+**Metis**:
+
+```markdown
+## Intent Classification
+**Type**: Refactoring
+**Confidence**: High
+**Rationale**: Explicit "refactor" keyword, existing code modification
+
+## Questions for User
+1. What specific behavior must be preserved? (test commands to verify)
+2. What's the rollback strategy if something breaks?
+3. Should this change propagate to related code, or stay isolated?
+
+## Identified Risks
+- Regression: Auth is security-critical - [Mitigation: Test before/after]
+- Scope creep: "Refactor" can expand - [Mitigation: Define exact files]
+
+## Directives for Prometheus
+- MUST: Define pre-refactor verification (exact test commands + expected outputs)
+- MUST: Verify after EACH change, not just at the end
+- MUST NOT: Change behavior while restructuring
+- MUST NOT: Refactor adjacent code not in scope
+- TOOL: Use `lsp_find_references` to map all usages before changes
+```
+
+### Example 2: New Feature Request
+
+**User**: Add user registration to the app
+
+**Metis**:
+
+*Fires explore to find auth patterns*
+
+*Fires librarian for registration best practices*
+
+```markdown
+## Intent Classification
+**Type**: Build from Scratch
+**Confidence**: High
+**Rationale**: New feature addition, greenfield work
+
+## Pre-Analysis Findings
+- Found JWT auth pattern in `src/auth/jwt.ts:15-45`
+- Found user model in `src/models/user.ts`
+- Best practice: Email verification before activation (OWASP)
+
+## Questions for User
+1. Found JWT auth in `auth/`. Should registration create JWT immediately, or require email verification first?
+2. Password requirements: match existing (8+ chars) or strengthen?
+3. What must explicitly NOT be built? (scope boundaries)
+
+## Directives for Prometheus
+- MUST: Follow JWT pattern from `src/auth/jwt.ts:15-45`
+- MUST: Define "Must NOT Have" section (AI over-engineering prevention)
+- MUST NOT: Invent new auth patterns when existing ones work
+- MUST NOT: Add features not explicitly requested
+- PATTERN: Follow `src/models/user.ts` for new user fields
+```
+
+### Example 3: Ambiguous Request
+
+**User**: Improve the dashboard
+
+**Metis**:
+
+```markdown
+## Intent Classification
+**Type**: Mid-sized Task (assuming scope clarification needed)
+**Confidence**: Low
+**Rationale**: "Improve" is vague - could be UX, performance, features, or refactoring
+
+## Questions for User
+1. What specific problem are you trying to solve with the dashboard?
+2. "Improve" means: (a) Better UX/design, (b) Faster performance, (c) New features, (d) Code quality?
+3. What are the EXACT outputs? (files, UI elements, metrics)
+4. What must NOT be changed? (existing features, APIs)
+
+## Identified Risks
+- Scope inflation: "Improve" can expand indefinitely - [Mitigation: Define exact deliverables]
+- AI over-engineering: May add unnecessary features - [Mitigation: Explicit exclusions]
+
+## Directives for Prometheus
+- MUST: Get clarity on improvement type before planning
+- MUST: "Must Have" section with exact deliverables
+- MUST: "Must NOT Have" section with explicit exclusions
+- MUST NOT: Proceed without user confirmation on scope
+```
+
+## When to Use Metis
+
+**Use when:**
+- Before planning non-trivial tasks
+- User request is ambiguous or open-ended
+- Need to prevent AI over-engineering patterns
+- Complex task requiring scope clarification
+- Want to ensure requirements are complete
+
+**Avoid when:**
+- Simple, well-defined tasks
+- User has already provided detailed requirements
+- Quick fixes that don't need analysis
+- Time-sensitive urgent work
+
+## Critical Rules
+
+**NEVER**:
+- Skip intent classification
+- Ask generic questions ("What's the scope?")
+- Proceed without addressing ambiguity
+- Make assumptions about user's codebase
+- Suggest acceptance criteria requiring user intervention
+- Leave QA/acceptance criteria vague
+
+**ALWAYS**:
+- Classify intent FIRST
+- Be specific ("Should this change UserService only, or also AuthService?")
+- Explore before asking (for Build/Research intents)
+- Provide actionable directives for Prometheus
+- Include QA automation directives
+- Ensure acceptance criteria are agent-executable
+
+## Extended Thinking
+
+Metis uses extended thinking (32K token budget) for:
+- Complex intent analysis
+- Risk identification
+- Directive generation
+- Question formulation
+
+## Related Agents
+
+- **Prometheus**: Receives Metis's directives and creates work plans
+- **Momus**: Reviews the plans Prometheus creates
+- **Sisyphus**: May invoke Metis for complex tasks
+- **Explore**: Used by Metis for codebase pattern discovery
+- **Librarian**: Used by Metis for external best practices

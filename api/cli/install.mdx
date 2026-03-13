@@ -1,0 +1,372 @@
+---
+title: "oh-my-opencode install"
+description: "Interactive and non-interactive installation and configuration setup"
+---
+
+## Overview
+
+The `install` command provides both interactive (TUI) and non-interactive (CLI) installation modes for Oh My OpenAgent. It detects available model providers, generates configuration files, and registers the plugin with OpenCode.
+
+## Command Syntax
+
+```bash
+oh-my-opencode install [options]
+```
+
+## Installation Modes
+
+### Interactive Mode (Default)
+
+Runs an interactive Terminal UI (TUI) installer with prompts:
+
+```bash
+bunx oh-my-opencode install
+```
+
+Features:
+- Detects current configuration
+- Provider availability checks
+- Step-by-step prompts
+- Configuration summary
+- Authentication guidance
+
+### Non-Interactive Mode
+
+Runs in non-interactive mode (requires all options):
+
+```bash
+bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes
+```
+
+## Options
+
+<ParamField path="--no-tui" type="flag">
+  Run in non-interactive mode
+  
+  Requires all provider options to be specified
+  
+  ```bash
+  oh-my-opencode install --no-tui --claude=yes --openai=no
+  ```
+</ParamField>
+
+<ParamField path="--claude" type="string">
+  Claude subscription level
+  
+  Values: `no`, `yes`, `max20`
+  
+  - `no`: No Claude subscription
+  - `yes`: Claude Pro subscription
+  - `max20`: Claude Max (20 Opus per day) subscription
+  
+  ```bash
+  oh-my-opencode install --claude=max20
+  ```
+</ParamField>
+
+<ParamField path="--openai" type="string" default="no">
+  OpenAI/ChatGPT subscription
+  
+  Values: `no`, `yes`
+  
+  ```bash
+  oh-my-opencode install --openai=yes
+  ```
+</ParamField>
+
+<ParamField path="--gemini" type="string">
+  Gemini integration
+  
+  Values: `no`, `yes`
+  
+  ```bash
+  oh-my-opencode install --gemini=yes
+  ```
+</ParamField>
+
+<ParamField path="--copilot" type="string">
+  GitHub Copilot subscription
+  
+  Values: `no`, `yes`
+  
+  ```bash
+  oh-my-opencode install --copilot=yes
+  ```
+</ParamField>
+
+<ParamField path="--opencode-zen" type="string" default="no">
+  OpenCode Zen access
+  
+  Values: `no`, `yes`
+  
+  ```bash
+  oh-my-opencode install --opencode-zen=yes
+  ```
+</ParamField>
+
+<ParamField path="--zai-coding-plan" type="string" default="no">
+  Z.ai Coding Plan subscription
+  
+  Values: `no`, `yes`
+  
+  ```bash
+  oh-my-opencode install --zai-coding-plan=yes
+  ```
+</ParamField>
+
+<ParamField path="--kimi-for-coding" type="string" default="no">
+  Kimi For Coding subscription
+  
+  Values: `no`, `yes`
+  
+  ```bash
+  oh-my-opencode install --kimi-for-coding=yes
+  ```
+</ParamField>
+
+<ParamField path="--opencode-go" type="string" default="no">
+  OpenCode Go subscription
+  
+  Values: `no`, `yes`
+  
+  ```bash
+  oh-my-opencode install --opencode-go=yes
+  ```
+</ParamField>
+
+<ParamField path="--skip-auth" type="flag">
+  Skip authentication setup hints
+  
+  Disables post-install authentication guidance
+  
+  ```bash
+  oh-my-opencode install --skip-auth
+  ```
+</ParamField>
+
+## Examples
+
+### Interactive Installation
+
+```bash
+bunx oh-my-opencode install
+```
+
+Follows these steps:
+1. Checks OpenCode installation
+2. Detects existing configuration
+3. Prompts for provider subscriptions
+4. Writes configuration files
+5. Registers plugin with OpenCode
+6. Shows authentication instructions
+
+### Claude Max + OpenAI
+
+```bash
+bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=no --copilot=no
+```
+
+### Copilot + OpenCode Zen
+
+```bash
+bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
+```
+
+### Update Existing Installation
+
+```bash
+bunx oh-my-opencode install
+```
+
+Automatically detects existing configuration and runs in update mode.
+
+## Model Provider Priority
+
+Installer generates configuration with this priority:
+
+1. **Native providers** (Claude, OpenAI, Gemini) - highest priority
+2. **Copilot** - fallback for Claude/OpenAI models
+3. **OpenCode Zen** - fallback for native models via OpenCode proxy
+4. **Z.ai** - visual-engineering fallback (GLM-5)
+5. **Kimi** - Sisyphus/Prometheus fallback (K2P5)
+
+## Configuration Files
+
+Installer creates/updates:
+
+### Plugin Registration
+
+`~/.config/opencode/config.json`
+
+```json
+{
+  "plugins": [
+    {
+      "name": "oh-my-opencode",
+      "version": "1.x.x"
+    }
+  ]
+}
+```
+
+### Oh My OpenAgent Config
+
+`~/.config/opencode/oh-my-opencode.jsonc`
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/schema.json",
+  "agents": {
+    "sisyphus": {
+      "category": "ultrabrain",
+      "fallback_models": ["openai/gpt-5.4", "google/gemini-3-pro"]
+    }
+  },
+  "categories": {
+    "ultrabrain": {
+      "model": "anthropic/claude-opus-4-5",
+      "fallback_models": ["openai/gpt-5.4"]
+    }
+  }
+}
+```
+
+## Post-Install Steps
+
+### Authenticate Providers
+
+Run `opencode auth login` and select:
+- **Anthropic** (Claude Pro/Max)
+- **Google** (Gemini)
+- **GitHub** (Copilot)
+
+### Verify Installation
+
+```bash
+oh-my-opencode doctor
+```
+
+Checks:
+- OpenCode binary installed
+- Plugin registered
+- Configuration valid
+- Model resolution working
+
+### Start Using
+
+```bash
+opencode
+```
+
+Or run non-interactively:
+
+```bash
+oh-my-opencode run "Fix the bug in index.ts"
+```
+
+## Critical Warnings
+
+### No Claude Subscription
+
+If you install without Claude:
+
+```
+CRITICAL WARNING
+
+Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.
+Without Claude, you may experience significantly degraded performance:
+  • Reduced orchestration quality
+  • Weaker tool selection and delegation
+  • Less reliable task completion
+
+Consider subscribing to Claude Pro/Max for the best experience.
+```
+
+### No Providers Configured
+
+If no providers are configured:
+
+```
+No model providers configured. Using opencode/big-pickle as fallback.
+```
+
+## Troubleshooting
+
+### OpenCode Binary Not Found
+
+```
+OpenCode binary not found [!]
+```
+
+Solution: Install OpenCode first
+
+```bash
+brew install opencode  # macOS
+# or visit https://opencode.ai/docs
+```
+
+### TTY Required for Interactive Mode
+
+```
+Error: Interactive installer requires a TTY. Use --non-interactive or set environment variables directly.
+```
+
+Solution: Use non-interactive mode
+
+```bash
+oh-my-opencode install --no-tui --claude=yes --openai=no --gemini=no --copilot=no
+```
+
+### Plugin Registration Failed
+
+```
+Failed to add plugin: <error>
+```
+
+Solution: Check OpenCode config file permissions and syntax
+
+```bash
+cat ~/.config/opencode/config.json
+```
+
+## Advanced Usage
+
+### Scripted Installation
+
+```bash
+#!/bin/bash
+oh-my-opencode install \
+  --no-tui \
+  --claude=max20 \
+  --openai=yes \
+  --gemini=yes \
+  --copilot=no \
+  --skip-auth
+```
+
+### CI/CD Installation
+
+```yaml
+- name: Install Oh My OpenAgent
+  run: |
+    bunx oh-my-opencode install \
+      --no-tui \
+      --claude=no \
+      --openai=yes \
+      --gemini=no \
+      --copilot=no \
+      --skip-auth
+```
+
+## Related Commands
+
+- [doctor](/api/cli/doctor) - Verify installation health
+- [run](/api/cli/run) - Non-interactive session launcher
+
+## Source Code
+
+Implementation:
+- `src/cli/install.ts` - Entry point
+- `src/cli/tui-installer.ts` - Interactive TUI installer
+- `src/cli/cli-installer.ts` - Non-interactive installer
+- `src/cli/config-manager/` - Configuration utilities

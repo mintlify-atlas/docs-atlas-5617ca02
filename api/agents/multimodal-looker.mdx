@@ -1,0 +1,324 @@
+---
+title: Multimodal Looker Agent
+description: Media file analysis agent for PDFs, images, and diagrams
+---
+
+## Overview
+
+Multimodal Looker is a specialized agent for analyzing media files that require interpretation beyond raw text. It examines PDFs, images, and diagrams to extract specific information or provide summaries.
+
+**Philosophy**: Extract ONLY what was requested, save context tokens by processing media offload.
+
+## Key Characteristics
+
+- **Mode**: `subagent` (invoked by other agents)
+- **Temperature**: `0.1`
+- **Default Model**: `gpt-5.3-codex` (medium variant)
+- **Cost**: CHEAP
+
+## Core Competencies
+
+- PDF text and structure extraction
+- Image description and layout analysis
+- Diagram interpretation and flow explanation
+- Table and data extraction from documents
+- UI element identification in screenshots
+- Chart and graph analysis
+
+## Model Fallback Chain
+
+1. **gpt-5.4** (medium) - OpenAI, OpenCode
+2. **kimi-k2.5** - OpenCode Go
+3. **glm-4.6v** - Z.ai Coding Plan
+4. **gpt-5-nano** - OpenAI, GitHub Copilot, OpenCode
+
+## Tool Restrictions
+
+**Extremely restricted agent - READ ONLY**:
+
+- **Allowed**: `read` (for media files only)
+- **Denied**: ALL other tools (write, edit, bash, grep, task, etc.)
+- **Question Permission**: Typically not used (focused on extraction)
+
+## Configuration
+
+### Basic Configuration
+
+```json
+{
+  "agents": {
+    "multimodal-looker": {
+      "model": "gpt-5.4",
+      "variant": "medium"
+    }
+  }
+}
+```
+
+### Configuration Options
+
+<ParamField path="agents.multimodal-looker.model" type="string">
+  Model to use for Multimodal Looker. Must support vision capabilities.
+</ParamField>
+
+<ParamField path="agents.multimodal-looker.variant" type="string" default="medium">
+  Reasoning effort variant: `low`, `medium`, `high`, `max`, or `xhigh`
+</ParamField>
+
+<ParamField path="agents.multimodal-looker.temperature" type="number" default="0.1">
+  Temperature for extraction (0.0-1.0)
+</ParamField>
+
+## How It Works
+
+1. **Receives**: File path + goal describing what to extract
+2. **Reads and analyzes**: File deeply with vision capabilities
+3. **Returns**: ONLY the relevant extracted information
+4. **Saves tokens**: Main agent never processes the raw file
+
+## Use Cases
+
+### For PDFs
+
+- Extract text from specific sections
+- Parse table data
+- Identify document structure (headings, sections)
+- Extract metadata (author, date, version)
+- Summarize specific pages or chapters
+
+### For Images
+
+- Describe UI layouts and elements
+- Identify text in images (OCR)
+- Describe visual composition
+- Analyze charts and graphs
+- Extract design patterns
+
+### For Diagrams
+
+- Explain relationships and flows
+- Describe architecture depicted
+- Identify components and connections
+- Extract workflow steps
+- Interpret system designs
+
+## When to Use Multimodal Looker
+
+**Use when:**
+- Media files cannot be read as plain text
+- Extracting specific information or summaries from documents
+- Describing visual content in images or diagrams
+- Need analyzed/extracted data, not raw file contents
+- Want to save context tokens in main agent
+
+**Avoid when:**
+- Source code or plain text files (use Read tool directly)
+- Files that need editing afterward (need literal content from Read)
+- Simple file reading where no interpretation needed
+- Text-based configuration files (JSON, YAML, etc.)
+
+## Response Rules
+
+1. **Return extracted information directly** - no preamble
+2. **If info not found** - state clearly what's missing
+3. **Match the language** of the request
+4. **Be thorough on the goal** - concise on everything else
+5. **Output goes straight to main agent** for continued work
+
+## Usage Examples
+
+### Example 1: PDF Table Extraction
+
+**Delegation**:
+```typescript
+task(
+  subagent_type="multimodal-looker",
+  description="Extract pricing table from PDF",
+  prompt="Extract the pricing table from page 3 of this PDF. Return as markdown table with columns: Plan, Price, Features.",
+  files=["./docs/pricing.pdf"]
+)
+```
+
+**Multimodal Looker Returns**:
+```markdown
+| Plan | Price | Features |
+|------|-------|----------|
+| Basic | $10/mo | 5 users, 10GB storage |
+| Pro | $25/mo | 20 users, 100GB storage, API access |
+| Enterprise | Custom | Unlimited users, Unlimited storage, Dedicated support |
+```
+
+### Example 2: UI Screenshot Analysis
+
+**Delegation**:
+```typescript
+task(
+  subagent_type="multimodal-looker",
+  description="Describe login form UI",
+  prompt="Describe the login form layout in this screenshot. Focus on: input fields, buttons, layout structure, and any validation messages.",
+  files=["./designs/login-screen.png"]
+)
+```
+
+**Multimodal Looker Returns**:
+```
+Login Form Layout:
+
+1. Header: "Welcome Back" centered at top
+2. Email input field: 
+   - Label: "Email Address"
+   - Placeholder: "your@email.com"
+   - Full width
+3. Password input field:
+   - Label: "Password"
+   - Type: password (masked)
+   - "Forgot password?" link aligned right
+4. "Remember me" checkbox below password
+5. Primary button: "Sign In" - blue, full width, rounded corners
+6. Divider with "OR"
+7. Social login buttons: Google, GitHub (icon + text, outlined style)
+8. "Don't have an account? Sign up" link at bottom
+
+Validation: Red error message below email field shows "Invalid email format"
+```
+
+### Example 3: Architecture Diagram Interpretation
+
+**Delegation**:
+```typescript
+task(
+  subagent_type="multimodal-looker",
+  description="Explain system architecture",
+  prompt="Explain the architecture shown in this diagram. Focus on: components, data flow, and integration points.",
+  files=["./docs/architecture.png"]
+)
+```
+
+**Multimodal Looker Returns**:
+```
+System Architecture:
+
+Components:
+1. Frontend (React): User interface layer
+2. API Gateway: Routes requests, handles auth
+3. Auth Service: JWT token management
+4. User Service: User CRUD operations
+5. PostgreSQL: User data storage
+6. Redis: Session cache
+
+Data Flow:
+1. User → Frontend → API Gateway
+2. API Gateway → Auth Service (validate token)
+3. API Gateway → User Service (business logic)
+4. User Service → PostgreSQL (data persistence)
+5. Auth Service ↔ Redis (session storage)
+
+Integration Points:
+- API Gateway uses REST for all service communication
+- Auth Service publishes events to message queue (not shown in detail)
+- Frontend polls API Gateway every 30s for notifications
+```
+
+### Example 4: PDF Section Extraction
+
+**Delegation**:
+```typescript
+task(
+  subagent_type="multimodal-looker",
+  description="Extract API documentation",
+  prompt="From this PDF, extract the section about POST /users endpoint. Include: parameters, request body format, response format, and example.",
+  files=["./api-docs.pdf"]
+)
+```
+
+**Multimodal Looker Returns**:
+```
+POST /users - Create User
+
+Parameters:
+None (body-based endpoint)
+
+Request Body (JSON):
+{
+  "email": "string (required, valid email)",
+  "password": "string (required, min 8 chars)",
+  "name": "string (required)",
+  "role": "string (optional, default: 'user')"
+}
+
+Response (201 Created):
+{
+  "id": "uuid",
+  "email": "string",
+  "name": "string",
+  "role": "string",
+  "created_at": "ISO 8601 timestamp"
+}
+
+Example Request:
+POST /users
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "SecurePass123",
+  "name": "John Doe"
+}
+
+Example Response:
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "john@example.com",
+  "name": "John Doe",
+  "role": "user",
+  "created_at": "2026-03-13T10:30:00Z"
+}
+```
+
+## Delegation Best Practices
+
+### Good Delegation
+
+```typescript
+task(
+  subagent_type="multimodal-looker",
+  description="Extract form fields from mockup",
+  prompt="List all form fields in this mockup. For each field, provide: label, type, required/optional, placeholder text, and any validation rules shown.",
+  files=["./designs/signup-form.png"]
+)
+```
+
+**Why good**: Specific extraction goal, clear output format
+
+### Bad Delegation
+
+```typescript
+task(
+  subagent_type="multimodal-looker",
+  description="Look at this image",
+  prompt="What do you see?",
+  files=["./image.png"]
+)
+```
+
+**Why bad**: Vague goal, no specific extraction target, will return too much irrelevant info
+
+## Context Token Savings
+
+Multimodal Looker saves tokens by:
+
+1. **Main agent never sees raw file** - only the extracted info
+2. **Targeted extraction** - only relevant data returned
+3. **Offloaded processing** - vision analysis happens in subagent
+
+Example savings:
+- 10-page PDF: ~20K tokens → 500 token extraction
+- High-res screenshot: ~3K tokens → 200 token description
+- Complex diagram: ~2K tokens → 300 token explanation
+
+## Related Agents
+
+- **Sisyphus**: May delegate media analysis to Multimodal Looker
+- **Hephaestus**: Uses Multimodal Looker for comprehensive media understanding
+- **Oracle**: May request media analysis for architectural diagrams
+- **Librarian**: Focuses on external docs (Multimodal Looker handles local media)

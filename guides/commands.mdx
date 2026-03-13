@@ -1,0 +1,498 @@
+---
+title: Commands
+description: Slash-triggered workflows that execute predefined templates
+---
+
+## What Are Commands?
+
+Commands are slash-triggered workflows that execute predefined templates. They provide:
+
+- **Quick access:** Type `/command-name` to trigger
+- **Predefined workflows:** Complex operations simplified into single commands
+- **Argument support:** Pass parameters to customize behavior
+- **Custom templates:** Create your own commands
+
+## Built-in Commands
+
+### /init-deep
+
+**Purpose:** Generate hierarchical AGENTS.md files throughout your project
+
+**Usage:**
+
+```plaintext
+/init-deep [--create-new] [--max-depth=N]
+```
+
+**What it does:**
+
+Creates directory-specific context files that agents automatically read:
+
+```plaintext
+project/
+├── AGENTS.md              # Project-wide context
+├── src/
+│   ├── AGENTS.md          # src-specific context
+│   └── components/
+│       └── AGENTS.md      # Component-specific context
+```
+
+**Options:**
+
+- `--create-new`: Create new AGENTS.md files even if they exist
+- `--max-depth=N`: Limit directory depth (default: unlimited)
+
+<Tip>
+AGENTS.md files are automatically injected when agents read files in those directories. This provides context-aware assistance throughout your codebase.
+</Tip>
+
+### /ralph-loop
+
+**Purpose:** Self-referential development loop that runs until task completion
+
+**Named after:** Anthropic's Ralph Wiggum plugin
+
+**Usage:**
+
+```plaintext
+/ralph-loop "Build a REST API with authentication"
+/ralph-loop "Refactor the payment module" --max-iterations=50
+```
+
+**Behavior:**
+
+- Agent works continuously toward the goal
+- Detects `<promise>DONE</promise>` to know when complete
+- Auto-continues if agent stops without completion
+- Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
+
+**Arguments:**
+
+- `--completion-promise=TEXT`: Custom completion marker (default: `<promise>DONE</promise>`)
+- `--max-iterations=N`: Maximum loop iterations (default: 100)
+- `--strategy=reset|continue`: How to handle continuation (default: continue)
+
+**Configure:**
+
+```json
+{
+  "ralph_loop": {
+    "enabled": true,
+    "default_max_iterations": 100
+  }
+}
+```
+
+### /ulw-loop
+
+**Purpose:** Same as ralph-loop but with ultrawork mode active
+
+**Usage:**
+
+```plaintext
+/ulw-loop "Implement the entire feature" --max-iterations=200
+```
+
+Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration.
+
+**Arguments:**
+
+- `--completion-promise=TEXT`: Custom completion marker
+- `--strategy=reset|continue`: How to handle continuation
+
+<Warning>
+No max-iterations limit for ulw-loop. It continues until completion or manual stop.
+</Warning>
+
+### /cancel-ralph
+
+**Purpose:** Cancel active Ralph Loop
+
+**Usage:**
+
+```plaintext
+/cancel-ralph
+```
+
+Immediately stops the current ralph-loop or ulw-loop execution.
+
+### /refactor
+
+**Purpose:** Intelligent refactoring with full toolchain
+
+**Usage:**
+
+```plaintext
+/refactor <target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]
+```
+
+**Features:**
+
+- **LSP-powered rename:** Workspace-wide symbol renaming
+- **AST-grep:** Pattern matching across 25 languages
+- **Architecture analysis:** Understand impact before changes
+- **TDD verification:** Run tests after changes
+- **Codemap generation:** Visual dependency graphs
+
+**Arguments:**
+
+- `<target>`: What to refactor (required)
+- `--scope=file|module|project`: Refactoring scope (default: file)
+- `--strategy=safe|aggressive`: How aggressive to be (default: safe)
+
+**Examples:**
+
+```plaintext
+/refactor authentication --scope=module --strategy=safe
+/refactor UserService.ts --scope=file
+/refactor entire codebase --scope=project --strategy=aggressive
+```
+
+### /start-work
+
+**Purpose:** Start execution from a Prometheus-generated plan
+
+**Usage:**
+
+```plaintext
+/start-work [plan-name]
+```
+
+Uses the Atlas agent to execute planned tasks systematically.
+
+**Workflow:**
+
+1. Prometheus creates a plan (interview mode or direct)
+2. Plan is saved with a name
+3. `/start-work plan-name` begins execution
+4. Atlas orchestrates task completion
+
+**Example:**
+
+```plaintext
+User: Create a plan to add authentication
+(Prometheus creates plan "auth-plan")
+
+User: /start-work auth-plan
+(Atlas begins executing tasks)
+```
+
+### /stop-continuation
+
+**Purpose:** Stop all continuation mechanisms for this session
+
+**Usage:**
+
+```plaintext
+/stop-continuation
+```
+
+Stops:
+- Ralph loop
+- Todo continuation
+- Boulder state
+- Any other multi-step workflows
+
+Use when you want the agent to stop its current multi-step workflow.
+
+### /handoff
+
+**Purpose:** Create a detailed context summary for continuing work in a new session
+
+**Usage:**
+
+```plaintext
+/handoff [goal]
+```
+
+Generates a structured handoff document capturing:
+- Current state
+- What was done
+- What remains
+- Relevant file paths
+- Key decisions
+
+Enables seamless continuation in a fresh session.
+
+**Example:**
+
+```plaintext
+/handoff "Complete the authentication feature"
+```
+
+## Creating Custom Commands
+
+### Command Load Locations
+
+Priority order (highest first):
+
+1. `.opencode/command/*.md` (project, OpenCode native)
+2. `~/.config/opencode/command/*.md` (user, OpenCode native)
+3. `.claude/commands/*.md` (project, Claude Code compat)
+4. `~/.config/opencode/commands/*.md` (user, Claude Code compat)
+
+### Basic Command Format
+
+Create `.opencode/command/my-command.md`:
+
+```markdown
+---
+name: my-command
+description: What this command does
+---
+
+# Command Instructions
+
+Detailed instructions for the agent on how to execute this command.
+
+## Steps
+
+1. First do this
+2. Then do this
+3. Finally do this
+
+## Requirements
+
+- Must verify results
+- Must follow existing patterns
+- Must document changes
+```
+
+### Command with Arguments
+
+Create `.opencode/command/deploy.md`:
+
+```markdown
+---
+name: deploy
+description: Deploy to specified environment
+argumentHint: "<environment> [--dry-run]"
+---
+
+# Deploy Command
+
+Arguments: $ARGUMENTS
+
+## Instructions
+
+1. Parse the environment from arguments
+2. Verify the environment is valid (staging, production)
+3. Run pre-deployment checks
+4. If --dry-run is present, only show what would happen
+5. Otherwise, execute deployment
+6. Verify deployment success
+
+## Environments
+
+- staging: Deploy to staging environment
+- production: Deploy to production (requires confirmation)
+```
+
+### Command with Agent Override
+
+Create `.opencode/command/review.md`:
+
+```markdown
+---
+name: review
+description: Comprehensive code review
+agent: oracle
+---
+
+# Code Review Command
+
+You are performing a comprehensive code review.
+
+## Review Checklist
+
+- Architecture and design patterns
+- Security vulnerabilities
+- Performance issues
+- Code quality and maintainability
+- Test coverage
+- Documentation
+
+## Output Format
+
+Provide a structured review with:
+1. Summary
+2. Critical issues
+3. Warnings
+4. Suggestions
+5. Positive observations
+```
+
+<Info>
+Setting `agent: oracle` forces this command to use the Oracle agent, which is read-only and optimized for analysis.
+</Info>
+
+### Command with Skill Loading
+
+Create `.opencode/command/git-commit.md`:
+
+```markdown
+---
+name: git-commit
+description: Commit changes with git-master
+---
+
+# Git Commit Command
+
+Arguments: $ARGUMENTS
+
+<command-instruction>
+Load the git-master skill and commit the specified changes.
+Follow all git-master principles for atomic commits.
+</command-instruction>
+
+<skills-to-load>
+- git-master
+</skills-to-load>
+
+<user-request>
+$ARGUMENTS
+</user-request>
+```
+
+## Command Configuration
+
+### Disabling Commands
+
+Disable built-in commands:
+
+```json
+{
+  "disabled_commands": ["init-deep", "ralph-loop", "start-work"]
+}
+```
+
+### Command Arguments
+
+Commands receive arguments via the `$ARGUMENTS` placeholder:
+
+```markdown
+---
+name: my-command
+---
+
+User provided: $ARGUMENTS
+```
+
+When user types `/my-command arg1 arg2`, `$ARGUMENTS` becomes `arg1 arg2`.
+
+### Session Context
+
+Commands can access session context:
+
+- `$SESSION_ID`: Current session identifier
+- `$TIMESTAMP`: Current timestamp
+
+Example:
+
+```markdown
+<session-context>
+Session ID: $SESSION_ID
+Timestamp: $TIMESTAMP
+</session-context>
+```
+
+## Command Best Practices
+
+### 1. Clear Instructions
+
+Provide step-by-step instructions:
+
+```markdown
+## Instructions
+
+1. Verify prerequisites
+2. Execute main operation
+3. Validate results
+4. Report outcome
+```
+
+### 2. Error Handling
+
+Include error handling guidance:
+
+```markdown
+## Error Handling
+
+- If X fails, try Y
+- If validation fails, report specific issues
+- Never leave the system in a broken state
+```
+
+### 3. Argument Validation
+
+Validate arguments early:
+
+```markdown
+## Argument Validation
+
+1. Parse arguments from $ARGUMENTS
+2. Verify required arguments are present
+3. Validate argument values
+4. Report clear error if invalid
+```
+
+### 4. Tool Usage
+
+Specify which tools to use:
+
+```markdown
+## Required Tools
+
+- Use `bash` tool for git operations
+- Use `read` tool to examine files
+- Use `edit` tool for modifications
+```
+
+### 5. Output Format
+
+Define expected output:
+
+```markdown
+## Output Format
+
+Provide:
+1. Summary of what was done
+2. List of modified files
+3. Next steps (if any)
+4. Warnings or errors encountered
+```
+
+## Using Commands with Task Delegation
+
+Commands can be triggered within task delegation:
+
+```typescript
+task({
+  category: "quick",
+  prompt: "Execute /git-commit with these changes",
+  load_skills: ["git-master"]
+})
+```
+
+Or reference commands in prompts:
+
+```plaintext
+Create a plan, then execute /start-work to begin implementation
+```
+
+## Command vs Skill
+
+| Feature | Command | Skill |
+|---------|---------|-------|
+| **Trigger** | `/command-name` | Loaded via `load_skills` |
+| **Purpose** | Execute workflow | Provide knowledge + tools |
+| **MCP Support** | No | Yes |
+| **Agent Override** | Yes | Yes |
+| **Arguments** | Yes | Limited |
+| **Persistence** | Single execution | Loaded for session |
+
+<Info>
+**When to use:**
+- **Command:** One-off operations, complex workflows, specific tasks
+- **Skill:** Domain expertise, tool access, repeated operations
+</Info>

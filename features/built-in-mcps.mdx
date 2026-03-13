@@ -1,0 +1,409 @@
+---
+title: Built-in MCPs
+description: Web search (Exa/Tavily), official docs (Context7), and GitHub search (Grep.app) - always available
+---
+
+## Overview
+
+Oh My OpenAgent includes three built-in MCP (Model Context Protocol) servers that provide external data access:
+
+- **websearch**: Real-time web search via Exa AI or Tavily
+- **context7**: Official library and framework documentation
+- **grep_app**: Ultra-fast code search across public GitHub repositories
+
+These are Tier 1 of the [three-tier MCP system](/features/built-in-mcps).
+
+## Web Search (Exa / Tavily)
+
+**MCP Name**: `websearch`
+
+**Purpose**: Real-time web search for current information, API docs, blog posts, and technical content
+
+**Default Provider**: Exa AI (`mcp.exa.ai`)
+
+**Alternative**: Tavily (`mcp.tavily.com`)
+
+### Configuration
+
+<Tabs>
+  <Tab title="Exa (Default)">
+    ```json src/.opencode/oh-my-opencode.jsonc
+    {
+      "websearch": {
+        "provider": "exa"  // default, can omit
+      }
+    }
+    ```
+
+    Set API key (optional, works without):
+    ```bash
+    export EXA_API_KEY="your-key-here"
+    ```
+  </Tab>
+
+  <Tab title="Tavily">
+    ```json src/.opencode/oh-my-opencode.jsonc
+    {
+      "websearch": {
+        "provider": "tavily"
+      }
+    }
+    ```
+
+    Set API key (required for Tavily):
+    ```bash
+    export TAVILY_API_KEY="your-key-here"
+    ```
+  </Tab>
+</Tabs>
+
+### Usage
+
+Agents automatically use web search when they need current information:
+
+```typescript
+// Agent internally calls
+websearch.search({
+  query: "Next.js 15 server actions best practices",
+  num_results: 5
+})
+```
+
+You can also explicitly request web search:
+
+```bash
+Search the web for the latest TypeScript 5.4 release notes
+```
+
+### Use Cases
+
+- **Current information**: "What's new in React 19?"
+- **API documentation**: "Stripe webhook signature verification"
+- **Blog posts**: "Best practices for PostgreSQL connection pooling"
+- **Error messages**: "Error: Cannot find module 'vite/client'"
+- **Library comparison**: "Prisma vs Drizzle ORM 2024"
+
+### Disabling Web Search
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "disabled_mcps": ["websearch"]
+}
+```
+
+## Context7 (Official Docs)
+
+**MCP Name**: `context7`
+
+**Purpose**: Official library and framework documentation lookup
+
+**URL**: `mcp.context7.com/mcp`
+
+**Coverage**: 10,000+ libraries including React, Vue, Next.js, Express, Django, Rails, etc.
+
+### Configuration
+
+No configuration required. Works out of the box.
+
+Optional API key for higher rate limits:
+
+```bash
+export CONTEXT7_API_KEY="your-key-here"
+```
+
+### Usage
+
+Agents automatically query Context7 for official docs:
+
+```typescript
+// Agent internally calls
+context7.lookup({
+  library: "express",
+  topic: "middleware"
+})
+```
+
+You can also explicitly request official docs:
+
+```bash
+Look up the official Express.js middleware documentation
+```
+
+### Use Cases
+
+- **Official API reference**: "Express req.body parsing"
+- **Framework guides**: "Next.js App Router data fetching"
+- **Configuration options**: "Vite build options"
+- **Migration guides**: "Vue 2 to Vue 3 migration"
+- **Best practices**: "React Hooks rules"
+
+### How It Works
+
+Context7 maintains mirrors of official documentation from:
+- npm packages
+- GitHub repositories
+- Official documentation sites
+- Framework guides
+
+It provides **structured, up-to-date** documentation without web scraping.
+
+### Disabling Context7
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "disabled_mcps": ["context7"]
+}
+```
+
+## Grep.app (GitHub Search)
+
+**MCP Name**: `grep_app`
+
+**Purpose**: Ultra-fast code search across 500,000+ public GitHub repositories
+
+**URL**: `mcp.grep.app`
+
+**Coverage**: Top repos by stars across all major languages
+
+### Configuration
+
+No configuration required. No API key needed.
+
+### Usage
+
+Agents automatically search GitHub repos for implementation examples:
+
+```typescript
+// Agent internally calls
+grep_app.search({
+  query: "WebSocket reconnection logic",
+  language: "typescript",
+  limit: 10
+})
+```
+
+You can also explicitly request GitHub search:
+
+```bash
+Find TypeScript implementations of Redis connection pooling on GitHub
+```
+
+### Use Cases
+
+- **Implementation patterns**: "How do popular repos handle JWT refresh tokens?"
+- **Real-world examples**: "Production-ready Prisma migration setup"
+- **Best practices**: "Error handling in Express middleware"
+- **Library usage**: "How to use zod with tRPC"
+- **Architecture patterns**: "Monorepo structure with Turborepo"
+
+### Search Tips
+
+<CardGroup cols={2}>
+  <Card title="Be Specific" icon="magnifying-glass">
+    "TypeScript Redis connection pooling" better than "Redis"
+  </Card>
+  <Card title="Include Language" icon="code">
+    Narrow results: "error handling language:typescript"
+  </Card>
+  <Card title="Use Quotes" icon="quotes">
+    Exact match: "async function connect()"
+  </Card>
+  <Card title="Limit Results" icon="filter">
+    Top results usually most relevant: limit=5
+  </Card>
+</CardGroup>
+
+### Disabling Grep.app
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "disabled_mcps": ["grep_app"]
+}
+```
+
+## MCP Comparison
+
+| MCP | Source | Freshness | Coverage | Rate Limit | API Key |
+|-----|--------|-----------|----------|------------|----------|
+| **websearch** | Web (Exa/Tavily) | Real-time | Entire web | 100/day (free) | Optional (Exa) / Required (Tavily) |
+| **context7** | Official docs | Daily sync | 10k+ libraries | 100/day (free) | Optional |
+| **grep_app** | GitHub repos | Weekly sync | 500k+ repos | Unlimited | Not needed |
+
+## When Agents Use MCPs
+
+### Automatic MCP Selection
+
+Agents automatically choose the right MCP based on the query:
+
+```typescript
+// Query: "Next.js 15 features"
+websearch.search(...)  // Latest blog posts
+
+// Query: "Next.js data fetching docs"
+context7.lookup(...)   // Official Next.js docs
+
+// Query: "Next.js authentication examples"
+grep_app.search(...)   // GitHub repos
+```
+
+### Librarian Agent
+
+The Librarian agent specializes in external documentation lookup:
+
+```typescript
+task({
+  subagent_type: "librarian",
+  run_in_background: true,
+  prompt: "Find JWT security best practices from OWASP and production examples from GitHub"
+})
+```
+
+Librarian will:
+1. Query `context7` for OWASP JWT documentation
+2. Query `grep_app` for production JWT implementations
+3. Query `websearch` for recent security advisories
+4. Synthesize findings into actionable recommendations
+
+## Three-Tier MCP System
+
+Built-in MCPs are **Tier 1** of a three-tier system:
+
+```
+Tier 1: Built-in MCPs (websearch, context7, grep_app)
+  ↓
+Tier 2: Claude Code MCPs (.mcp.json)
+  ↓
+Tier 3: Skill-Embedded MCPs (SKILL.md)
+```
+
+<CardGroup cols={3}>
+  <Card title="Tier 1: Built-in" icon="1">
+    Always available
+    No setup required
+    Global scope
+  </Card>
+  <Card title="Tier 2: Claude Code" icon="2">
+    User-configured
+    .mcp.json files
+    Persistent sessions
+  </Card>
+  <Card title="Tier 3: Skill-Embedded" icon="3">
+    On-demand
+    Scoped to skills
+    Auto cleanup
+  </Card>
+</CardGroup>
+
+See [Skill-Embedded MCPs](/features/skill-embedded-mcps) for Tier 3 details.
+
+## Advanced Configuration
+
+### Per-MCP Settings
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "mcp": {
+    "websearch": {
+      "enabled": true,
+      "provider": "exa"
+    },
+    "context7": {
+      "enabled": true
+    },
+    "grep_app": {
+      "enabled": true
+    }
+  }
+}
+```
+
+### Environment Variables
+
+```bash src/.env
+# Exa (optional)
+EXA_API_KEY=exa_xxx
+
+# Tavily (required if using Tavily)
+TAVILY_API_KEY=tvly_xxx
+
+# Context7 (optional)
+CONTEXT7_API_KEY=ctx7_xxx
+```
+
+### Custom Headers
+
+For enterprise deployments:
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "mcp": {
+    "websearch": {
+      "headers": {
+        "X-Organization-ID": "your-org-id",
+        "Authorization": "Bearer ${CUSTOM_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+## Troubleshooting
+
+### MCP Not Working
+
+**Symptom**: Agent says "MCP not available"
+
+**Solutions**:
+1. Check MCP is not in `disabled_mcps`
+2. Verify API key if required (Tavily)
+3. Check network connectivity
+4. Check logs: `/tmp/oh-my-opencode.log`
+
+### Rate Limit Exceeded
+
+**Symptom**: "Rate limit exceeded" error
+
+**Solutions**:
+1. Set API key for higher limits
+2. Reduce query frequency
+3. Use different MCP provider
+4. Contact provider for higher tier
+
+### Slow Responses
+
+**Symptom**: MCP queries taking >10 seconds
+
+**Solutions**:
+1. Check internet connection
+2. Try different provider (Exa vs Tavily)
+3. Reduce num_results parameter
+4. Use caching where applicable
+
+## Best Practices
+
+### For Web Search
+
+1. **Be specific**: "Next.js 15 server actions" vs "Next.js"
+2. **Include version**: "TypeScript 5.4" vs "TypeScript"
+3. **Add context**: "production PostgreSQL pooling" vs "PostgreSQL"
+4. **Limit results**: 5-10 results usually sufficient
+
+### For Context7
+
+1. **Use official names**: "Express.js" vs "express"
+2. **Be explicit**: "React Hooks API" vs "React hooks"
+3. **Include version**: "Vue 3 Composition API" vs "Vue"
+4. **Check freshness**: Docs updated daily, but check version
+
+### For Grep.app
+
+1. **Use language filter**: Narrows results significantly
+2. **Search for patterns**: "async function connect" finds actual code
+3. **Look at stars**: Top repos usually have better examples
+4. **Check recency**: Recent repos use current patterns
+
+## Related Topics
+
+- [Skill-Embedded MCPs](/features/skill-embedded-mcps) - On-demand MCP servers
+- [MCP Architecture](/features/built-in-mcps) - Three-tier system
+- [Librarian Agent](/api/agents/librarian) - External documentation specialist

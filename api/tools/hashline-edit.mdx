@@ -1,0 +1,311 @@
+---
+title: Hashline Edit
+description: Hash-anchored file editing with LINE#ID references
+---
+
+## Overview
+
+Hashline Edit provides a hash-anchored file editing system where every line reference includes a content hash (`LINE#ID`). This prevents editing stale file versions by validating hashes before applying changes.
+
+## What is Hashline Edit?
+
+Traditional line-based editing can corrupt files if the file changes between read and edit. Hashline Edit solves this by:
+
+1. **Tagging every line** with a content hash during read
+2. **Validating hashes** before applying edits
+3. **Rejecting stale edits** if content has changed
+
+## LINE#ID Format
+
+```
+{line_number}#{hash_id}
+```
+
+- `line_number`: 1-based line number
+- `hash_id`: 2-character hash from alphabet `ZPMQVRWSNKTXJBYH`
+
+**Example:**
+```
+42#VK| function hello() {
+```
+
+Means: line 42 with hash `VK`, content follows after `|`
+
+## Tool: hashline_edit
+
+Perform hash-validated file edits using LINE#ID references.
+
+<ParamField path="file" type="string" required>
+  Path to file to edit
+</ParamField>
+
+<ParamField path="edits" type="HashlineEdit[]" required>
+  Array of edit operations (replace, append, prepend)
+</ParamField>
+
+<ParamField path="delete" type="boolean">
+  Delete the entire file (default: false)
+</ParamField>
+
+**Returns:** Diff output showing applied changes
+
+## Edit Operations
+
+Three operation types:
+
+### Replace
+
+Replace a single line or range of lines.
+
+```typescript
+{
+  op: "replace",
+  pos: "42#VK",        // Required: anchor line
+  end: "45#MQ",        // Optional: end of range
+  lines: "new content" // Required: replacement content
+}
+```
+
+**Delete lines:** Use `lines: null` or `lines: []`
+
+### Append
+
+Insert lines after an anchor (or at end of file).
+
+```typescript
+{
+  op: "append",
+  pos: "42#VK",        // Optional: anchor line (omit for EOF)
+  lines: "new content" // Required: content to append
+}
+```
+
+### Prepend
+
+Insert lines before an anchor (or at start of file).
+
+```typescript
+{
+  op: "prepend",
+  pos: "42#VK",        // Optional: anchor line (omit for BOF)
+  lines: "new content" // Required: content to prepend
+}
+```
+
+## Examples
+
+### Replace a Single Line
+
+```typescript
+hashline_edit({
+  file: "src/app.ts",
+  edits: [
+    {
+      op: "replace",
+      pos: "10#ZP",
+      lines: "const name = 'updated';"
+    }
+  ]
+})
+```
+
+### Replace a Range
+
+```typescript
+hashline_edit({
+  file: "src/app.ts",
+  edits: [
+    {
+      op: "replace",
+      pos: "10#ZP",
+      end: "15#KT",
+      lines: "// Replaced\nfunction newFunc() {\n  return 42;\n}"
+    }
+  ]
+})
+```
+
+### Delete Lines
+
+```typescript
+hashline_edit({
+  file: "src/app.ts",
+  edits: [
+    {
+      op: "replace",
+      pos: "10#ZP",
+      end: "15#KT",
+      lines: null  // or lines: []
+    }
+  ]
+})
+```
+
+### Append at End of File
+
+```typescript
+hashline_edit({
+  file: "src/app.ts",
+  edits: [
+    {
+      op: "append",
+      // No pos = append at EOF
+      lines: "\n// New footer comment"
+    }
+  ]
+})
+```
+
+### Prepend at Start of File
+
+```typescript
+hashline_edit({
+  file: "src/app.ts",
+  edits: [
+    {
+      op: "prepend",
+      // No pos = prepend at BOF
+      lines: "// File header\n"
+    }
+  ]
+})
+```
+
+### Multiple Edits
+
+```typescript
+hashline_edit({
+  file: "src/app.ts",
+  edits: [
+    {
+      op: "replace",
+      pos: "5#WS",
+      lines: "const updated = true;"
+    },
+    {
+      op: "append",
+      pos: "20#BY",
+      lines: "\n// Added comment"
+    },
+    {
+      op: "replace",
+      pos: "30#XJ",
+      end: "32#VR",
+      lines: null  // Delete range
+    }
+  ]
+})
+```
+
+## Execution Pipeline
+
+```
+hashline-edit-executor.ts
+  → normalize-edits.ts         # Parse and validate op schemas
+  → validation.ts              # Validate LINE#ID hashes
+  → edit-ordering.ts           # Sort bottom-up (preserve line numbers)
+  → edit-deduplication.ts      # Remove duplicates
+  → edit-operations.ts         # Apply operations
+  → autocorrect-replacement-lines.ts  # Fix indentation
+  → hashline-edit-diff.ts      # Generate diff output
+```
+
+## Hash Validation
+
+Before applying edits:
+
+1. Parse `LINE#ID` references
+2. Recompute hash of current line content
+3. Compare with stored hash
+4. **Reject if mismatch** (file changed since read)
+
+**Example Error:**
+```
+Error: Hash mismatch at line 42
+Expected: VK
+Actual: PM
+
+The file has changed since it was read. Please re-read and try again.
+
+Current content:
+42| function hello(name: string) {  // <-- changed!
+```
+
+## Autocorrect Behaviors
+
+Built-in autocorrect:
+
+- **Indentation:** Restored from original lines
+- **Line merging:** Auto-expanded to original count
+- **BOM/CRLF:** Preserved from original file
+- **Diff markers:** `>>>` prefix auto-stripped from `lines`
+
+## Edit Ordering
+
+Edits are automatically sorted **bottom-up** to preserve line numbers:
+
+```typescript
+// User provides in any order
+edits: [
+  { op: "replace", pos: "10#ZP" },
+  { op: "replace", pos: "50#KT" },
+  { op: "append", pos: "30#VW" }
+]
+
+// Executed bottom-up
+// 1. pos: "50#KT" (line 50)
+// 2. pos: "30#VW" (line 30)
+// 3. pos: "10#ZP" (line 10)
+```
+
+## Error Cases
+
+### Hash Mismatch
+
+```
+Error: Hash mismatch at line 42
+File changed since read. Re-read and retry.
+```
+
+### Overlapping Ranges
+
+```
+Error: Overlapping edit ranges detected
+Edit 1: lines 10-15
+Edit 2: lines 12-18
+```
+
+### Missing Position
+
+```
+Error: 'replace' operation requires 'pos'
+```
+
+### Invalid Lines
+
+```
+Error: 'append' and 'prepend' require non-null 'lines'
+```
+
+## Configuration
+
+Enable/disable hashline_edit:
+
+```json
+{
+  "hashline_edit": true  // Enable tool (default: false)
+}
+```
+
+When enabled, the `hashline-read-enhancer` hook automatically adds `LINE#ID` tags to Read tool output.
+
+## Related Hooks
+
+- **hashline-read-enhancer** - Adds LINE#ID tags to Read output
+- **hashline-edit-diff-enhancer** - Enhanced diff output for edits
+
+## Related Documentation
+
+- [Tools Overview](/api/tools/overview)
+- [LSP Tools](/api/tools/lsp)
+- [Hooks Overview](/api/hooks/overview)

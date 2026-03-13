@@ -1,0 +1,490 @@
+---
+title: Skill-Embedded MCPs
+description: On-demand MCP servers that spin up with skills and disappear when done - zero context bloat
+---
+
+## The Problem
+
+Traditional MCP servers eat your context budget:
+
+- **Always loaded**: Every MCP tool appears in every prompt
+- **Context bloat**: 50+ tools × 200 tokens each = 10k tokens wasted
+- **Token cost**: Paying for tools you're not using
+- **Reduced capacity**: Less space for actual code
+
+## The Solution
+
+Skill-embedded MCPs bring their own servers:
+
+1. **On-demand**: MCP spins up only when skill is loaded
+2. **Scoped**: MCP only available to agents using that skill
+3. **Auto-cleanup**: MCP shuts down when skill session ends
+4. **Zero bloat**: No unused tools in context
+
+<Info>
+  This is **Tier 3** of the [three-tier MCP system](/features/built-in-mcps). Built-in MCPs (Tier 1) are always on. Skill-embedded MCPs (Tier 3) are ephemeral.
+</Info>
+
+## How It Works
+
+### Skill YAML with MCP
+
+```yaml src/.opencode/skills/playwright/SKILL.md
+---
+name: playwright
+description: Browser automation via Playwright MCP
+mcp:
+  playwright:
+    command: npx
+    args: ["-y", "@playwright/mcp@latest"]
+---
+
+You are a browser automation specialist.
+Use the Playwright MCP to control browsers.
+...
+```
+
+### Lifecycle
+
+```typescript
+// 1. Agent loads skill
+task({
+  category: "visual-engineering",
+  load_skills: ["playwright"],
+  prompt: "Navigate to example.com and take screenshot"
+})
+
+// 2. SkillMcpManager spins up MCP server
+// - Runs: npx -y @playwright/mcp@latest
+// - Discovers tools: playwright_navigate, playwright_screenshot, etc.
+// - Makes tools available to agent
+
+// 3. Agent uses MCP tools
+skill_mcp({
+  mcp_name: "playwright",
+  tool_name: "playwright_navigate",
+  arguments: { url: "https://example.com" }
+})
+
+// 4. Session ends → MCP server shuts down
+// - No cleanup needed
+// - No lingering processes
+```
+
+## Usage
+
+### Invoking Skill MCP Tools
+
+```typescript
+skill_mcp({
+  mcp_name: "playwright",           // MCP name from SKILL.md
+  tool_name: "playwright_screenshot", // Tool exposed by MCP
+  arguments: {                       // Tool-specific arguments
+    path: "screenshot.png",
+    fullPage: true
+  }
+})
+```
+
+### Discovering MCP Tools
+
+Agents automatically discover available tools when skill loads:
+
+```typescript
+// After loading playwright skill, agent sees:
+// - playwright_navigate
+// - playwright_screenshot
+// - playwright_click
+// - playwright_fill
+// - etc.
+```
+
+### Resource Access
+
+Some MCPs expose resources (e.g., browser state):
+
+```typescript
+skill_mcp({
+  mcp_name: "playwright",
+  resource_name: "browser/state",
+  arguments: {}
+})
+```
+
+### Prompt Invocation
+
+Some MCPs expose prompts (templates):
+
+```typescript
+skill_mcp({
+  mcp_name: "playwright",
+  prompt_name: "navigate_and_screenshot",
+  arguments: {
+    url: "https://example.com",
+    output: "screenshot.png"
+  }
+})
+```
+
+## Built-in Skills with MCPs
+
+### Playwright (Browser Automation)
+
+```yaml
+mcp:
+  playwright:
+    command: npx
+    args: ["-y", "@playwright/mcp@latest"]
+```
+
+**Tools**:
+- `playwright_navigate`: Navigate to URL
+- `playwright_screenshot`: Capture screenshot
+- `playwright_click`: Click element
+- `playwright_fill`: Fill form field
+- `playwright_evaluate`: Run JavaScript
+
+**Usage**:
+```bash
+Load playwright skill and navigate to github.com, then take a screenshot
+```
+
+### Dev-Browser (Stateful Browser)
+
+```yaml
+mcp:
+  dev-browser:
+    command: npx
+    args: ["-y", "dev-browser-mcp"]
+```
+
+**Features**:
+- Persistent browser state
+- Authenticated sessions
+- Multi-page navigation
+- Network inspection
+
+**Usage**:
+```bash
+Load dev-browser skill, login to the admin panel, then scrape user data
+```
+
+## Creating Custom Skills with MCPs
+
+### Example: Postgres MCP
+
+```yaml src/.opencode/skills/postgres/SKILL.md
+---
+name: postgres
+description: PostgreSQL database queries and schema inspection
+mcp:
+  postgres:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-postgres"]
+    env:
+      DATABASE_URL: "${POSTGRES_URL}"
+---
+
+You are a database specialist.
+Use the Postgres MCP to query and inspect databases.
+
+## Available Tools
+- postgres_query: Execute SQL query
+- postgres_schema: Inspect database schema
+- postgres_tables: List all tables
+
+## Examples
+
+```sql
+-- Find users created in last 7 days
+SELECT * FROM users WHERE created_at > NOW() - INTERVAL '7 days'
+```
+
+### Example: Stripe MCP
+
+```yaml src/.opencode/skills/stripe/SKILL.md
+---
+name: stripe
+description: Stripe payment processing and webhook handling
+mcp:
+  stripe:
+    command: npx
+    args: ["-y", "stripe-mcp-server"]
+    env:
+      STRIPE_API_KEY: "${STRIPE_SECRET_KEY}"
+---
+
+You are a payment integration specialist.
+Use the Stripe MCP to interact with Stripe APIs.
+
+## Available Tools
+- stripe_create_payment_intent
+- stripe_create_customer
+- stripe_list_charges
+- stripe_webhook_verify
+```
+
+## MCP Types
+
+Skill-embedded MCPs support two transport types:
+
+### stdio (Standard I/O)
+
+```yaml
+mcp:
+  my-mcp:
+    type: stdio  # optional, default
+    command: npx
+    args: ["-y", "my-mcp-server"]
+    env:
+      API_KEY: "${MY_API_KEY}"
+```
+
+MCP runs as child process, communicates via stdin/stdout.
+
+### HTTP (Remote Server)
+
+```yaml
+mcp:
+  my-mcp:
+    type: remote
+    url: "https://mcp.example.com"
+    headers:
+      Authorization: "Bearer ${API_TOKEN}"
+```
+
+MCP runs remotely, communicates via HTTP.
+
+### OAuth-Protected HTTP
+
+```yaml
+mcp:
+  my-api:
+    type: remote
+    url: "https://api.example.com/mcp"
+    oauth:
+      clientId: "${CLIENT_ID}"
+      scopes: ["read", "write"]
+```
+
+See [MCP OAuth](/api/cli/mcp-oauth) for details.
+
+## Environment Variables
+
+Skills can use environment variables:
+
+```yaml
+mcp:
+  postgres:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-postgres"]
+    env:
+      DATABASE_URL: "${POSTGRES_URL}"      # From shell environment
+      PGUSER: "${DB_USER}"                 # From .env file
+      PGPASSWORD: "${DB_PASSWORD}"         # From .env file
+```
+
+Variables are resolved at MCP startup:
+1. Shell environment variables
+2. `.env` file in project root
+3. `.env.local` file (git-ignored)
+
+## Context Management
+
+### Before: Global MCPs
+
+```
+System prompt (5k tokens)
++ 50 global MCP tools × 200 tokens = 10k tokens
++ Conversation history (20k tokens)
++ Code context (30k tokens)
+────────────────────────────────────────
+Total: 65k tokens / 200k limit = 32% used before any work
+```
+
+### After: Skill-Embedded MCPs
+
+```
+System prompt (5k tokens)
++ Only relevant skill MCP tools × 200 tokens = 1k tokens
++ Conversation history (20k tokens)
++ Code context (30k tokens)
+────────────────────────────────────────
+Total: 56k tokens / 200k limit = 28% used
+
+Saved: 9k tokens (14% context window)
+```
+
+## Advanced Features
+
+### Multiple MCPs per Skill
+
+```yaml
+mcp:
+  postgres:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-postgres"]
+  redis:
+    command: npx
+    args: ["-y", "redis-mcp-server"]
+```
+
+Both MCPs available when skill is loaded.
+
+### Conditional MCP Loading
+
+MCPs only load if command is available:
+
+```yaml
+mcp:
+  playwright:
+    command: npx
+    args: ["-y", "@playwright/mcp@latest"]
+    # If npx not found, skill loads without MCP
+```
+
+### MCP Tool Filtering
+
+Limit which MCP tools are exposed:
+
+```yaml
+allowed-tools:
+  - postgres_query     # Only expose query tool
+  - postgres_schema    # And schema inspection
+  # postgres_tables not exposed
+```
+
+### MCP Session Sharing
+
+Multiple agents can share same MCP session:
+
+```typescript
+// Agent A loads skill
+task({
+  category: "deep",
+  load_skills: ["postgres"],
+  prompt: "Create migration for users table"
+})
+
+// Agent B uses same MCP session
+task({
+  session_id: agent_a_session,
+  load_skills: ["postgres"],
+  prompt: "Run the migration"
+})
+// Both agents share postgres MCP connection
+```
+
+## Troubleshooting
+
+### MCP Server Not Starting
+
+**Symptom**: `skill_mcp` returns "MCP not available"
+
+**Causes**:
+1. Command not found (e.g., `npx` not in PATH)
+2. Package not found (e.g., `@playwright/mcp` doesn't exist)
+3. Environment variable not set
+4. MCP server crashed on startup
+
+**Solutions**:
+1. Check command is installed: `which npx`
+2. Test MCP manually: `npx -y @playwright/mcp@latest`
+3. Check logs: `/tmp/oh-my-opencode.log`
+4. Verify environment variables are set
+
+### MCP Tools Not Appearing
+
+**Symptom**: Agent doesn't see MCP tools
+
+**Causes**:
+1. Skill not loaded correctly
+2. MCP server started but didn't advertise tools
+3. Tool discovery failed
+
+**Solutions**:
+1. Verify skill loaded: check session messages
+2. Check MCP server logs
+3. Test MCP server directly
+
+### MCP Session Timeout
+
+**Symptom**: MCP commands fail after long idle
+
+**Causes**:
+1. MCP server timed out
+2. HTTP connection closed
+3. Process killed
+
+**Solutions**:
+1. Reload skill to restart MCP
+2. Implement keepalive in MCP server
+3. Use stdio instead of HTTP
+
+## Performance Considerations
+
+### Startup Time
+
+MCP servers take 1-3 seconds to start:
+
+```typescript
+// stdio MCP: 1-2 seconds (npx fetch + process start)
+// HTTP MCP: <1 second (just HTTP handshake)
+```
+
+For fast skills, use HTTP MCPs. For security, use stdio.
+
+### Memory Usage
+
+Each MCP server is a separate process:
+
+```
+Stdio MCP: ~50-100 MB RAM per server
+HTTP MCP: negligible (remote server)
+```
+
+Limit concurrent skills with MCPs to avoid memory issues.
+
+### Token Savings
+
+Skill-embedded MCPs save 5-10k tokens per session:
+
+```
+50 global MCP tools × 200 tokens = 10k tokens
+5 skill MCP tools × 200 tokens = 1k tokens
+────────────────────────────────────────
+Savings: 9k tokens per session
+```
+
+## Best Practices
+
+### For Skill Authors
+
+1. **Minimal tool sets**: Only include essential MCP tools
+2. **Clear descriptions**: Document what each tool does
+3. **Environment variables**: Use `${VAR}` for secrets
+4. **Error handling**: MCPs should fail gracefully
+
+### For Users
+
+1. **Load skills explicitly**: Don't load unused skills
+2. **Use stdio for secrets**: HTTP MCPs expose API keys
+3. **Check logs**: MCP errors logged to `/tmp/oh-my-opencode.log`
+4. **Cleanup**: Skills auto-cleanup, but verify
+
+## Comparison: Three MCP Tiers
+
+| Aspect | Tier 1: Built-in | Tier 2: Claude Code | Tier 3: Skill-Embedded |
+|--------|------------------|---------------------|------------------------|
+| **Availability** | Always | Session lifetime | Skill lifetime |
+| **Context Cost** | High (global) | Medium (session) | Low (scoped) |
+| **Setup** | None | .mcp.json | SKILL.md |
+| **Use Case** | General (web, docs) | User-specific | Task-specific |
+| **Examples** | websearch, context7 | GitHub, Slack | Playwright, Postgres |
+
+## Related Topics
+
+- [Built-in MCPs](/features/built-in-mcps) - Always-available MCPs
+- [MCP Architecture](/features/built-in-mcps) - Three-tier system
+- [Skills](/guides/skills) - Skill system overview
+- [MCP OAuth](/api/cli/mcp-oauth) - OAuth-protected MCPs

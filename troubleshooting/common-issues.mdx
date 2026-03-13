@@ -1,0 +1,605 @@
+---
+title: Common Issues
+description: Solutions for frequently encountered problems
+---
+
+## Installation Problems
+
+### Plugin Not Registered
+
+**Symptoms:** OpenCode doesn't recognize oh-my-opencode commands or agents
+
+**Cause:** Plugin not added to OpenCode config
+
+**Solution:**
+
+<Steps>
+  <Step title="Check OpenCode config">
+    Open `~/.config/opencode/opencode.json` or `~/.config/opencode/opencode.jsonc`
+  </Step>
+  
+  <Step title="Verify plugin array">
+    Ensure `oh-my-opencode` is in the plugins list:
+    
+    ```json
+    {
+      "plugin": ["oh-my-opencode"]
+    }
+    ```
+  </Step>
+  
+  <Step title="Restart OpenCode">
+    Close and reopen OpenCode for changes to take effect.
+  </Step>
+</Steps>
+
+<Tip>
+  Run `oh-my-opencode doctor --mode=verbose` to check registration status.
+</Tip>
+
+### Version Mismatch
+
+**Symptoms:** Features missing, unexpected behavior, or crashes
+
+**Cause:** Oh-My-OpenCode version incompatible with OpenCode version
+
+**Solution:**
+
+```bash
+# Check versions
+oh-my-opencode get-local-version
+opencode --version
+
+# Ensure OpenCode >=1.0.150
+# Update oh-my-opencode to latest
+npm install -g oh-my-opencode@latest
+```
+
+<Warning>
+  Oh-My-OpenCode requires OpenCode **1.0.150 or higher**. Older versions are not supported.
+</Warning>
+
+### npm Install Fails
+
+**Symptoms:** `npm install -g oh-my-opencode` errors
+
+**Common Causes:**
+
+<AccordionGroup>
+  <Accordion title="Permission denied">
+    ```bash
+    # Use sudo (not recommended) or fix npm permissions
+    sudo npm install -g oh-my-opencode
+    
+    # Better: Fix npm global install permissions
+    mkdir ~/.npm-global
+    npm config set prefix '~/.npm-global'
+    echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+    source ~/.bashrc
+    npm install -g oh-my-opencode
+    ```
+  </Accordion>
+  
+  <Accordion title="Network timeout">
+    ```bash
+    # Use longer timeout
+    npm install -g oh-my-opencode --timeout=60000
+    
+    # Or use different registry
+    npm install -g oh-my-opencode --registry=https://registry.npmjs.org/
+    ```
+  </Accordion>
+  
+  <Accordion title="Node version too old">
+    Oh-My-OpenCode requires Node.js 18+:
+    
+    ```bash
+    node --version  # Should be v18.0.0 or higher
+    
+    # Update Node via nvm
+    nvm install 20
+    nvm use 20
+    npm install -g oh-my-opencode
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Model Configuration Issues
+
+### Model Not Found
+
+**Symptoms:** Error: "Model not available" or "Provider not configured"
+
+**Cause:** Missing API keys or model ID typos
+
+**Solution:**
+
+<Steps>
+  <Step title="Check API keys">
+    Verify all provider keys are set:
+    
+    ```bash
+    # Check environment
+    echo $ANTHROPIC_API_KEY
+    echo $OPENAI_API_KEY
+    echo $GOOGLE_API_KEY
+    
+    # Or check OpenCode config
+    cat ~/.config/opencode/opencode.json | grep -A5 apiKeys
+    ```
+  </Step>
+  
+  <Step title="Verify model IDs">
+    Check for typos in `oh-my-opencode.json`:
+    
+    ```json
+    {
+      "agents": {
+        "sisyphus": {
+          "model": "anthropic/claude-opus-4-6",  // ✅ Correct
+          // "model": "claude-opus-4-6",         // ❌ Missing provider prefix
+        }
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Run doctor check">
+    ```bash
+    oh-my-opencode doctor --mode=verbose
+    ```
+    
+    Look for model resolution errors in the output.
+  </Step>
+</Steps>
+
+### Agent Uses Wrong Model
+
+**Symptoms:** Agent claims to be using Model X but behaves like Model Y
+
+**Cause:** Model override or fallback chain
+
+**Solution:**
+
+<CodeGroup>
+```bash Check effective model
+oh-my-opencode doctor --mode=verbose
+# Look for "Effective Model" for each agent
+```
+
+```json Override model explicitly
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-6",
+      "fallback_models": []  // Disable fallback
+    }
+  }
+}
+```
+</CodeGroup>
+
+<Info>
+  Model fallback chains are automatic. If primary model is unavailable, the system tries alternatives. Check `doctor` output for fallback details.
+</Info>
+
+### Provider Authentication Fails
+
+**Symptoms:** 401/403 errors when using specific providers
+
+**Common Issues:**
+
+<AccordionGroup>
+  <Accordion title="Anthropic API key invalid">
+    ```bash
+    # Verify key starts with 'sk-ant-'
+    echo $ANTHROPIC_API_KEY | head -c 10
+    
+    # Test directly
+    curl -X POST https://api.anthropic.com/v1/messages \
+      -H "x-api-key: $ANTHROPIC_API_KEY" \
+      -H "anthropic-version: 2023-06-01" \
+      -H "content-type: application/json" \
+      -d '{"model":"claude-3-haiku-20240307","max_tokens":10,"messages":[{"role":"user","content":"Hi"}]}'
+    ```
+  </Accordion>
+  
+  <Accordion title="OpenAI key lacks permissions">
+    ```bash
+    # Verify key has access to required models
+    curl https://api.openai.com/v1/models \
+      -H "Authorization: Bearer $OPENAI_API_KEY"
+    
+    # Check for gpt-4, gpt-5.3-codex, etc.
+    ```
+  </Accordion>
+  
+  <Accordion title="Google/Gemini not configured">
+    ```bash
+    # Set API key
+    export GOOGLE_API_KEY="your-key-here"
+    
+    # Or add to OpenCode config
+    {
+      "providers": {
+        "google": {
+          "apiKey": "your-key-here"
+        }
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Authentication Errors
+
+### Session Authentication Failed
+
+**Symptoms:** "Authentication required" or "Unauthorized" errors
+
+**Cause:** OpenCode session expired or not logged in
+
+**Solution:**
+
+```bash
+# Check OpenCode auth status
+opencode auth status
+
+# Re-authenticate if needed
+opencode auth login
+```
+
+### MCP OAuth Failures
+
+**Symptoms:** MCP tools fail with "OAuth token expired" or "Authorization required"
+
+**Solution:**
+
+<Steps>
+  <Step title="Check OAuth status">
+    ```bash
+    oh-my-opencode mcp oauth status <server-name>
+    ```
+  </Step>
+  
+  <Step title="Re-authenticate">
+    ```bash
+    oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
+    ```
+  </Step>
+  
+  <Step title="Verify token storage">
+    ```bash
+    # Check token file exists and is readable
+    ls -la ~/.config/opencode/mcp-oauth.json
+    
+    # Should be chmod 0600 (rw-------)
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  OAuth tokens are stored in `~/.config/opencode/mcp-oauth.json` with 0600 permissions. Don't share this file or commit it to version control.
+</Warning>
+
+## Performance Troubleshooting
+
+### Slow Agent Responses
+
+**Symptoms:** Long delays before agent starts responding
+
+**Common Causes:**
+
+<CardGroup cols={2}>
+  <Card title="Context Window Full" icon="database">
+    **Check:**
+    ```bash
+    # Monitor context usage
+    # Look for "Context Window Monitor" in logs
+    tail -f /tmp/oh-my-opencode.log
+    ```
+    
+    **Fix:**
+    - Run session compaction manually
+    - Enable preemptive compaction
+    - Use shorter AGENTS.md files
+  </Card>
+  
+  <Card title="Too Many Background Agents" icon="users">
+    **Check:**
+    ```
+    # Ask in session:
+    How many background tasks are running?
+    ```
+    
+    **Fix:**
+    - Reduce concurrency limit in config
+    - Wait for tasks to complete
+    - Cancel unnecessary tasks
+  </Card>
+</CardGroup>
+
+### High Token Usage
+
+**Symptoms:** Bills higher than expected, hitting rate limits
+
+**Solutions:**
+
+<AccordionGroup>
+  <Accordion title="Optimize AGENTS.md">
+    - Keep root AGENTS.md under 150 lines
+    - Subdirectory AGENTS.md under 80 lines
+    - Remove generic content
+    - Use telegraphic style (no full sentences)
+  </Accordion>
+  
+  <Accordion title="Use cheaper models for simple tasks">
+    ```json
+    {
+      "categories": {
+        "quick": {
+          "model": "anthropic/claude-haiku-4-5",  // Cheaper
+        }
+      }
+    }
+    ```
+    
+    Delegate simple tasks to `quick` category:
+    ```
+    task(category="quick", prompt="Fix typo in README")
+    ```
+  </Accordion>
+  
+  <Accordion title="Disable extended thinking for routine tasks">
+    ```json
+    {
+      "agents": {
+        "sisyphus": {
+          "thinking": {
+            "type": "disabled"
+          }
+        }
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Session Hangs
+
+**Symptoms:** Agent stops responding, session appears frozen
+
+**Check:**
+
+<Steps>
+  <Step title="Verify agent is idle">
+    Look for:
+    - Tool execution in progress (Read, LSP, etc.)
+    - Background tasks running
+    - Thinking phase (extended thinking can take time)
+  </Step>
+  
+  <Step title="Check for errors">
+    ```bash
+    # Check plugin logs
+    tail -f /tmp/oh-my-opencode.log
+    
+    # Look for error stack traces
+    ```
+  </Step>
+  
+  <Step title="Force continuation">
+    If truly stuck:
+    ```
+    # Send a message to wake the agent
+    Continue with the task
+    
+    # Or cancel continuation mechanisms
+    /stop-continuation
+    ```
+  </Step>
+</Steps>
+
+## Tool Execution Failures
+
+### LSP Tools Not Working
+
+**Symptoms:** `lsp_diagnostics`, `lsp_rename`, etc. return "LSP not available"
+
+**Solution:**
+
+<Steps>
+  <Step title="Check LSP server availability">
+    ```bash
+    oh-my-opencode doctor --mode=verbose
+    # Look for "LSP Servers" section
+    ```
+  </Step>
+  
+  <Step title="Install language servers">
+    For TypeScript:
+    ```bash
+    npm install -g typescript-language-server
+    ```
+    
+    For Python:
+    ```bash
+    pip install python-lsp-server
+    ```
+  </Step>
+  
+  <Step title="Verify project configuration">
+    LSP requires project config files:
+    - TypeScript: `tsconfig.json`
+    - Python: `pyproject.toml` or `setup.py`
+  </Step>
+</Steps>
+
+### AST-Grep Fails
+
+**Symptoms:** `ast_grep_search` or `ast_grep_replace` errors
+
+**Solution:**
+
+```bash
+# Install ast-grep
+cargo install ast-grep
+# or
+brew install ast-grep
+
+# Verify installation
+oh-my-opencode doctor --mode=verbose | grep -A5 "AST-Grep"
+```
+
+### GitHub CLI Not Found
+
+**Symptoms:** Git-related tools fail with "gh command not found"
+
+**Solution:**
+
+```bash
+# Install GitHub CLI
+brew install gh
+# or
+sudo apt install gh
+
+# Authenticate
+gh auth login
+
+# Verify
+oh-my-opencode doctor --mode=verbose | grep -A5 "GitHub CLI"
+```
+
+## Configuration Errors
+
+### Invalid JSON/JSONC
+
+**Symptoms:** Plugin fails to load, syntax errors
+
+**Solution:**
+
+<CodeGroup>
+```bash Validate config
+oh-my-opencode doctor --mode=verbose
+# Look for "Config Validation" section
+```
+
+```bash Find syntax errors
+# Use a JSON validator
+cat ~/.config/opencode/oh-my-opencode.jsonc | jq .
+# or
+cat .opencode/oh-my-opencode.json | jq .
+```
+</CodeGroup>
+
+<Tip>
+  JSONC supports comments and trailing commas. If using `.json` (not `.jsonc`), remove comments and trailing commas.
+</Tip>
+
+### Schema Validation Fails
+
+**Symptoms:** Config loads but features don't work as expected
+
+**Cause:** Invalid field names or types
+
+**Solution:**
+
+```bash
+# Doctor shows schema errors
+oh-my-opencode doctor --mode=verbose
+
+# Common mistakes:
+# - Wrong field names (modelId vs modelID)
+# - Missing required fields
+# - Wrong types (string vs number)
+```
+
+**Valid config structure:**
+
+```json
+{
+  "agents": {
+    "<agent-name>": {
+      "model": "provider/model-id",
+      "variant": "max" | "xhigh" | "high" | "medium" | "low",
+      "temperature": 0.0 - 2.0,
+      "maxTokens": number,
+      "thinking": { "type": "enabled", "budgetTokens": number }
+    }
+  },
+  "categories": {
+    "<category-name>": {
+      "description": "string",
+      "model": "provider/model-id",
+      "temperature": number
+    }
+  },
+  "disabled_hooks": ["hook-name"],
+  "disabled_agents": ["agent-name"],
+  "disabled_skills": ["skill-name"]
+}
+```
+
+## Continuation Issues
+
+### Todo Enforcer Too Aggressive
+
+**Symptoms:** Countdown appears constantly, interrupts work
+
+**Solution:**
+
+<Tabs>
+  <Tab title="Disable temporarily">
+    ```
+    /stop-continuation
+    ```
+    
+    Stops todo enforcer, ralph loop, and atlas for the current session.
+  </Tab>
+  
+  <Tab title="Disable permanently">
+    ```json
+    {
+      "disabled_hooks": ["todo-continuation-enforcer"]
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Ralph Loop Never Completes
+
+**Symptoms:** Loop runs to max iterations without finishing
+
+**Cause:** Task too vague or agent can't determine completion
+
+**Solution:**
+
+<Steps>
+  <Step title="Cancel current loop">
+    ```
+    /cancel-ralph
+    ```
+  </Step>
+  
+  <Step title="Restart with clearer task">
+    Be specific about completion criteria:
+    
+    ❌ "Improve the code"
+    
+    ✅ "Refactor user service to use dependency injection AND ensure all tests pass"
+  </Step>
+  
+  <Step title="Monitor progress">
+    ```
+    What todos remain?
+    ```
+    
+    Check if agent is making progress or stuck.
+  </Step>
+</Steps>
+
+## Related Documentation
+
+- [Doctor Checks](/troubleshooting/doctor-checks) - Detailed health diagnostics
+- [Configuration Reference](/guides/configuration) - Complete config options
+- [Model Setup](/installation#step-5-understand-your-model-setup) - Provider configuration guide

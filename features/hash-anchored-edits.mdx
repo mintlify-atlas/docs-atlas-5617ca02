@@ -1,0 +1,465 @@
+---
+title: Hash-Anchored Edits
+description: LINE#ID content validation for zero stale-line errors and surgical code edits
+---
+
+## The Harness Problem
+
+> "None of these tools give the model a stable, verifiable identifier for the lines it wants to change... They all rely on the model reproducing content it already saw. When it can't - and it often can't - the user blames the model."
+>
+> — [Can Bölük, The Harness Problem](https://blog.can.ac/2026/02/12/the-harness-problem/)
+
+Most agent failures aren't the model. **It's the edit tool.**
+
+Traditional edit tools rely on agents reproducing exact line content. When the file changes between read and edit, the agent references stale lines, causing:
+
+- Silent corruption (wrong lines modified)
+- Edit rejection (content mismatch)
+- Wasted tokens (retrying failed edits)
+- User frustration ("the model is broken")
+
+## The Solution: Hash-Anchored Edits
+
+Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi), we implemented **Hashline**: every line the agent reads comes back tagged with a content hash.
+
+```
+11#VK| function hello() {
+22#XJ|   return "world";
+33#MB| }
+```
+
+The agent edits by referencing those tags. If the file changed since the last read, the hash won't match and the edit is rejected **before corruption**.
+
+### Success Rate Improvement
+
+Grok Code Fast 1: **6.7% → 68.3%** success rate
+
+Just from changing the edit tool. Same model. Same prompts.
+
+## How It Works
+
+### 1. Reading Files
+
+When an agent reads a file, every line gets a hash tag:
+
+```typescript src/example.ts
+11#VK| export function calculateTotal(items: Item[]): number {
+22#XJ|   return items.reduce((sum, item) => sum + item.price, 0);
+33#MB| }
+```
+
+Hash format: `{line_number}#{hash_id}`
+- `hash_id`: Two characters from alphabet `ZPMQVRWSNKTXJBYH` (CID letters)
+- Separator: `|` (pipe) between tag and content
+
+### 2. Editing Files
+
+The agent references lines by their hash tags:
+
+```typescript
+{
+  op: "replace",
+  pos: "22#XJ",
+  lines: "  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);"
+}
+```
+
+### 3. Validation
+
+Before applying the edit:
+
+1. Parse the tag: `22#XJ` → line 22, hash `XJ`
+2. Read current content of line 22
+3. Compute hash of current content
+4. Compare: `XJ` (from tag) vs computed hash
+5. If match → apply edit
+6. If mismatch → reject with diff showing current state
+
+### 4. Result
+
+**On success**:
+```
+✓ File updated: src/example.ts
+  + 1 line added
+  - 1 line removed
+  Changed lines: 22
+```
+
+**On hash mismatch**:
+```
+✗ Hash mismatch at line 22
+  Expected hash: XJ
+  Current content: return items.reduce((sum, item) => sum + (item.price * 0.9), 0);
+  
+  The file has changed since you last read it.
+  Re-read the file and try again.
+```
+
+## Three-Operation Model
+
+All edits use exactly three operations:
+
+### Replace
+
+Replace single line or range:
+
+```typescript
+// Replace single line
+{
+  op: "replace",
+  pos: "22#XJ",
+  lines: "  return items.reduce((sum, item) => sum + item.price, 0);"
+}
+
+// Replace range
+{
+  op: "replace",
+  pos: "22#XJ",
+  end: "25#PQ",
+  lines: [
+    "  const total = items.reduce((sum, item) => {",
+    "    return sum + item.price * item.quantity;",
+    "  }, 0);",
+    "  return total;"
+  ]
+}
+
+// Delete line(s)
+{
+  op: "replace",
+  pos: "22#XJ",
+  lines: null  // or lines: []
+}
+```
+
+### Append
+
+Insert after anchor (or EOF if no anchor):
+
+```typescript
+// Append after specific line
+{
+  op: "append",
+  pos: "33#MB",
+  lines: [
+    "",
+    "export function calculateTax(total: number): number {",
+    "  return total * 0.1;",
+    "}"
+  ]
+}
+
+// Append to end of file
+{
+  op: "append",
+  lines: ["// End of file"]
+}
+```
+
+### Prepend
+
+Insert before anchor (or BOF if no anchor):
+
+```typescript
+// Prepend before specific line
+{
+  op: "prepend",
+  pos: "11#VK",
+  lines: [
+    "import type { Item } from './types';",
+    ""
+  ]
+}
+
+// Prepend to start of file
+{
+  op: "prepend",
+  lines: ["// SPDX-License-Identifier: MIT"]
+}
+```
+
+## Advanced Features
+
+### Multi-Edit Execution
+
+Multiple edits in a single operation:
+
+```typescript
+{
+  filePath: "src/example.ts",
+  edits: [
+    { op: "replace", pos: "11#VK", lines: "export async function calculateTotal(items: Item[]): Promise<number> {" },
+    { op: "replace", pos: "22#XJ", lines: "  return await items.reduce(async (sum, item) => await sum + item.price, 0);" },
+    { op: "append", pos: "33#MB", lines: ["  // Added async support"] }
+  ]
+}
+```
+
+Edits are:
+1. **Normalized**: Parse and validate schema
+2. **Validated**: Check all hash references
+3. **Ordered**: Sort bottom-up (preserves line numbers)
+4. **Deduplicated**: Remove overlapping operations
+5. **Applied**: Execute primitives in order
+
+### Autocorrect Behaviors
+
+Built-in corrections:
+
+- **Indentation restoration**: Auto-restore indentation from original lines
+- **Line merging**: Merged lines auto-expanded back to original count
+- **BOM preservation**: Byte Order Mark preserved if present
+- **CRLF preservation**: Windows line endings preserved
+- **Diff marker stripping**: `>>>` prefixes and conflict markers auto-removed
+
+### Edit Ordering
+
+Edits are sorted **bottom-up** (descending line number) to preserve line numbers during multi-edit:
+
+```typescript
+// Input order (not guaranteed)
+[
+  { op: "replace", pos: "22#XJ", ... },
+  { op: "replace", pos: "11#VK", ... },
+  { op: "append", pos: "33#MB", ... }
+]
+
+// Execution order (bottom-up)
+[
+  { op: "append", pos: "33#MB", ... },   // 3. Last
+  { op: "replace", pos: "22#XJ", ... },  // 2. Middle
+  { op: "replace", pos: "11#VK", ... }   // 1. First
+]
+```
+
+### Edit Deduplication
+
+Overlapping or identical operations are automatically deduplicated:
+
+```typescript
+// Before deduplication
+[
+  { op: "replace", pos: "22#XJ", lines: "new content" },
+  { op: "replace", pos: "22#XJ", lines: "newer content" }  // Duplicate!
+]
+
+// After deduplication
+[
+  { op: "replace", pos: "22#XJ", lines: "newer content" }  // Last one wins
+]
+```
+
+## Error Handling
+
+### Hash Mismatch
+
+**Cause**: File changed since last read
+
+**Error**:
+```
+HashlineMismatchError: Hash mismatch at line 22
+  Expected: XJ
+  Actual content: (current line content)
+  Computed hash: YZ
+```
+
+**Solution**: Re-read the file and try again with updated hashes
+
+### Overlapping Ranges
+
+**Cause**: Multiple edits affect same lines
+
+**Error**:
+```
+Overlapping edits detected:
+  Edit 1: lines 22-25
+  Edit 2: lines 24-28
+```
+
+**Solution**: Combine into single edit or separate operations
+
+### Missing Position
+
+**Cause**: `replace` without `pos`
+
+**Error**:
+```
+Schema error: 'pos' is required for 'replace' operation
+```
+
+**Solution**: Provide line reference with hash tag
+
+### Invalid Operation
+
+**Cause**: `lines: null` with `append`/`prepend`
+
+**Error**:
+```
+Schema error: 'lines' cannot be null for 'append'/'prepend'
+```
+
+**Solution**: Use `lines: []` for empty insert, or use `replace` for deletion
+
+## Implementation Details
+
+### Hash Computation
+
+From `src/tools/hashline-edit/hash-computation.ts`:
+
+```typescript
+function computeLineHash(line: string): string {
+  // 1. Normalize line (trim trailing whitespace, CRLF → LF)
+  const normalized = line.trimEnd().replace(/\r\n/g, '\n')
+  
+  // 2. Compute hash using CRC-like algorithm
+  let hash = 0
+  for (const char of normalized) {
+    hash = ((hash << 5) - hash) + char.charCodeAt(0)
+  }
+  
+  // 3. Map to 2-char CID (alphabet: ZPMQVRWSNKTXJBYH)
+  const alphabet = 'ZPMQVRWSNKTXJBYH'
+  const first = alphabet[Math.abs(hash) % 16]
+  const second = alphabet[Math.abs(hash >> 4) % 16]
+  
+  return first + second
+}
+```
+
+### Execution Pipeline
+
+```typescript
+// From src/tools/hashline-edit/hashline-edit-executor.ts
+
+executeHashlineEditTool()
+  → normalizeHashlineEdits()       // Parse RawHashlineEdit → HashlineEdit
+  → validateHashlineEdits()        // Validate LINE#ID references
+  → orderEdits()                   // Sort bottom-up
+  → deduplicateEdits()            // Remove duplicates
+  → applyHashlineEdits()          // Execute operations
+  → autocorrectReplacementLines() // Fix indentation
+  → generateUnifiedDiff()         // Build diff output
+```
+
+### File Text Canonicalization
+
+Before hashing, file content is canonicalized:
+
+```typescript
+// From src/tools/hashline-edit/file-text-canonicalization.ts
+
+function canonicalizeFileText(content: string): string {
+  // 1. Remove BOM if present
+  let result = content.replace(/^\ufeff/, '')
+  
+  // 2. Normalize line endings (CRLF → LF)
+  result = result.replace(/\r\n/g, '\n')
+  
+  // 3. Ensure trailing newline
+  if (!result.endsWith('\n')) {
+    result += '\n'
+  }
+  
+  return result
+}
+```
+
+When writing back, original format is restored.
+
+## Configuration
+
+Enable/disable hashline edit tool:
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "tools": {
+    "hashline_edit": true  // enabled by default
+  }
+}
+```
+
+Disable if you prefer traditional edit tool:
+
+```json src/.opencode/oh-my-opencode.jsonc
+{
+  "disabled_tools": ["hashline_edit"]
+}
+```
+
+## Best Practices
+
+### For Agents
+
+1. **Always use hash tags** - Never reference lines by content
+2. **Re-read on mismatch** - File changed, get fresh hashes
+3. **Batch edits** - Multiple operations in single call
+4. **Check diffs** - Verify output matches intent
+
+### For Developers
+
+1. **Trust the hash validation** - Mismatches are real conflicts
+2. **Don't override** - If validation fails, file changed for a reason
+3. **Read before edit** - Ensure you have current hashes
+4. **Use bottom-up order** - When manually creating edits
+
+## Comparison: Traditional vs Hashline
+
+| Aspect | Traditional Edit | Hashline Edit |
+|--------|------------------|---------------|
+| **Line Reference** | Line content (string match) | Hash tag (LINE#ID) |
+| **Validation** | String equality | Hash comparison |
+| **Stale Detection** | None (silent corruption) | Immediate (reject) |
+| **Whitespace** | Must match exactly | Normalized automatically |
+| **Success Rate** | 6.7% (Grok Fast) | 68.3% (Grok Fast) |
+| **Error Recovery** | Retry with same content | Re-read and retry |
+
+## Troubleshooting
+
+### "Hash mismatch" Errors
+
+**Symptom**: Every edit fails with hash mismatch
+
+**Causes**:
+1. File was modified between read and edit
+2. Another agent edited the file
+3. LSP auto-format changed content
+4. External process modified file
+
+**Solutions**:
+1. Re-read the file to get current hashes
+2. Enable file locking if available
+3. Disable auto-format during agent editing
+4. Use version control to track changes
+
+### "Overlapping edits" Errors
+
+**Symptom**: Multiple edits rejected
+
+**Causes**:
+1. Two edits affect same line range
+2. Append/prepend at same position
+
+**Solutions**:
+1. Combine into single edit
+2. Execute edits sequentially
+3. Re-order edits to avoid overlap
+
+### Indentation Issues
+
+**Symptom**: Indentation doesn't match surrounding code
+
+**Causes**:
+1. Mixing tabs and spaces
+2. Editor auto-format conflict
+3. Autocorrect not working
+
+**Solutions**:
+1. Match indentation style (check .editorconfig)
+2. Use consistent whitespace in edit lines
+3. Let autocorrect handle it (built-in)
+
+## Related Topics
+
+- [LSP Tools](/features/lsp-ast-tools) - Refactoring with LSP precision
+- [Edit Tool](/api/tools/hashline-edit) - Traditional content-based editing
+- [Read Tool](/api/tools/hashline-edit) - Reading files with hash tags

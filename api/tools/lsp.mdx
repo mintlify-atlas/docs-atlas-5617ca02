@@ -1,0 +1,276 @@
+---
+title: LSP Tools
+description: Language Server Protocol tools for code intelligence and refactoring
+---
+
+## Overview
+
+The LSP tools provide full Language Server Protocol integration, enabling code intelligence operations like go-to-definition, find references, symbol search, diagnostics, and safe renaming. These tools manage their own LSP server processes and don't delegate to OpenCode's built-in LSP.
+
+## Architecture
+
+The LSP system uses a custom client stack:
+
+```
+tools.ts (6 ToolDefinition exports)
+  ↓
+LspClientWrapper (high-level API)
+  ↓
+LSPClient (file tracking, document sync)
+  ↓
+LSPClientConnection (JSON-RPC layer)
+  ↓
+LSPClientTransport (stdin/stdout framing)
+  ↓
+LSPProcess (server process management)
+```
+
+## Available Tools
+
+### lsp_goto_definition
+
+Jump to the definition of a symbol at a specific position.
+
+<ParamField path="filePath" type="string" required>
+  Path to the source file
+</ParamField>
+
+<ParamField path="line" type="number" required>
+  Line number (0-based)
+</ParamField>
+
+<ParamField path="character" type="number" required>
+  Character position in line (0-based)
+</ParamField>
+
+**Returns:** Location(s) of the symbol definition
+
+**Example:**
+```typescript
+lsp_goto_definition({
+  filePath: "src/index.ts",
+  line: 42,
+  character: 15
+})
+```
+
+### lsp_find_references
+
+Find all references to a symbol across the workspace.
+
+<ParamField path="filePath" type="string" required>
+  Path to the source file
+</ParamField>
+
+<ParamField path="line" type="number" required>
+  Line number (0-based)
+</ParamField>
+
+<ParamField path="character" type="number" required>
+  Character position in line (0-based)
+</ParamField>
+
+<ParamField path="includeDeclaration" type="boolean">
+  Include the declaration in results (default: true)
+</ParamField>
+
+**Returns:** List of all locations where the symbol is referenced
+
+**Example:**
+```typescript
+lsp_find_references({
+  filePath: "src/utils.ts",
+  line: 10,
+  character: 8,
+  includeDeclaration: false
+})
+```
+
+### lsp_symbols
+
+Get document outline or search for workspace symbols.
+
+<ParamField path="filePath" type="string">
+  Path to file for document symbols (omit for workspace search)
+</ParamField>
+
+<ParamField path="scope" type="'document' | 'workspace'" required>
+  Search scope: document outline or workspace-wide
+</ParamField>
+
+<ParamField path="query" type="string">
+  Search query for workspace symbols
+</ParamField>
+
+<ParamField path="limit" type="number">
+  Maximum number of results to return
+</ParamField>
+
+**Returns:** List of symbols with name, kind, location, and container
+
+**Example:**
+```typescript
+// Document symbols
+lsp_symbols({
+  filePath: "src/index.ts",
+  scope: "document"
+})
+
+// Workspace symbol search
+lsp_symbols({
+  scope: "workspace",
+  query: "createUser",
+  limit: 20
+})
+```
+
+### lsp_diagnostics
+
+Get errors, warnings, and other diagnostics from the language server.
+
+<ParamField path="filePath" type="string">
+  Path to file (omit for all workspace diagnostics)
+</ParamField>
+
+<ParamField path="severity" type="'error' | 'warning' | 'info' | 'hint'">
+  Filter by severity level
+</ParamField>
+
+**Returns:** List of diagnostics with message, severity, range, and source
+
+**Example:**
+```typescript
+// All diagnostics for a file
+lsp_diagnostics({
+  filePath: "src/app.ts"
+})
+
+// Only errors across workspace
+lsp_diagnostics({
+  severity: "error"
+})
+```
+
+### lsp_prepare_rename
+
+Validate that a symbol can be safely renamed.
+
+<ParamField path="filePath" type="string" required>
+  Path to the source file
+</ParamField>
+
+<ParamField path="line" type="number" required>
+  Line number (0-based)
+</ParamField>
+
+<ParamField path="character" type="number" required>
+  Character position in line (0-based)
+</ParamField>
+
+**Returns:** Range that will be renamed, or error if rename not possible
+
+**Example:**
+```typescript
+lsp_prepare_rename({
+  filePath: "src/models.ts",
+  line: 5,
+  character: 12
+})
+```
+
+### lsp_rename
+
+Perform a safe symbol rename across the entire workspace.
+
+<ParamField path="filePath" type="string" required>
+  Path to the source file
+</ParamField>
+
+<ParamField path="line" type="number" required>
+  Line number (0-based)
+</ParamField>
+
+<ParamField path="character" type="number" required>
+  Character position in line (0-based)
+</ParamField>
+
+<ParamField path="newName" type="string" required>
+  New name for the symbol
+</ParamField>
+
+**Returns:** WorkspaceEdit with all changes, automatically applied to disk
+
+**Example:**
+```typescript
+lsp_rename({
+  filePath: "src/user.ts",
+  line: 10,
+  character: 15,
+  newName: "getUserById"
+})
+```
+
+## Server Management
+
+### Server Resolution
+
+Servers are resolved by file extension:
+
+1. Check user config (`.opencode/lsp.json`)
+2. Fall back to built-in server definitions (40+ servers)
+3. Verify binary exists (warn with install hint if missing)
+4. Spawn server process
+
+### Supported Languages
+
+40+ language servers including:
+- TypeScript/JavaScript (typescript-language-server)
+- Python (pyright, pylsp)
+- Rust (rust-analyzer)
+- Go (gopls)
+- Java (jdtls)
+- C/C++ (clangd)
+- And many more...
+
+### Custom Server Configuration
+
+Add custom LSP servers in `.opencode/lsp.json`:
+
+```json
+{
+  "servers": {
+    "mylang": {
+      "command": ["mylang-lsp", "--stdio"],
+      "filetypes": [".mylang"],
+      "rootIndicators": ["mylang.toml"]
+    }
+  }
+}
+```
+
+## Implementation Details
+
+### File Tracking
+
+Files must be opened via `didOpen` before LSP requests. The client automatically:
+- Opens files on first request
+- Tracks open files per session
+- Sends `didChange` notifications on file updates
+- Waits 1s after `didOpen` for server initialization
+
+### Process Cleanup
+
+Orphan LSP processes are automatically cleaned up:
+- On plugin exit
+- On session deletion
+- Via `lsp-manager-process-cleanup.ts`
+
+### Temporary Directories
+
+Some servers use temp directories (cleaned via `lsp-manager-temp-directory-cleanup.ts`).
+
+## Related Documentation
+
+- [Tools Overview](/api/tools/overview)
+- [AST-Grep](/api/tools/ast-grep)
+- [Session Manager](/api/tools/session-manager)
